@@ -36,9 +36,10 @@ namespace NGames.UI
         private Image           _characterImage;
         private Image           _placeholderBg;
         private TextMeshProUGUI _placeholderInitial;
+        private RawImage        _characterRawImage; // NEW: For 3D RenderTextures
         private RectTransform   _dialogueRt;
-        private CanvasGroup   _panelCg;
-        private Coroutine     _textAnimRoutine;
+        private CanvasGroup     _panelCg;
+        private Coroutine       _textAnimRoutine;
 
         // Anchor presets for dialogue text
         private static readonly Vector2 TextAnchorMinFull    = new(0.02f, 0.06f);
@@ -105,6 +106,18 @@ namespace NGames.UI
             imgRt.anchorMax = Vector2.one;
             imgRt.offsetMin = imgRt.offsetMax = Vector2.zero;
 
+            // 3D Portrait RawImage
+            var rawGo = new GameObject("Portrait3D");
+            rawGo.transform.SetParent(slot.transform, false);
+            _characterRawImage                = rawGo.AddComponent<RawImage>();
+            _characterRawImage.raycastTarget  = false;
+            _characterRawImage.color          = Color.white;
+            _characterRawImage.gameObject.SetActive(false);
+            var rawRt = rawGo.GetComponent<RectTransform>();
+            rawRt.anchorMin = Vector2.zero;
+            rawRt.anchorMax = Vector2.one;
+            rawRt.offsetMin = rawRt.offsetMax = Vector2.zero;
+
             // Placeholder — dark tinted background + initial letter
             var phGo = new GameObject("Placeholder");
             phGo.transform.SetParent(slot.transform, false);
@@ -145,6 +158,18 @@ namespace NGames.UI
             if (_characterImage == null) return;
             _characterImage.sprite = sprite;
             _characterImage.gameObject.SetActive(true);
+            if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
+            if (_placeholderBg != null) _placeholderBg.gameObject.SetActive(false);
+            ShowSlot(true);
+        }
+
+        /// <summary>Show a 3D Render Texture inside the character slot.</summary>
+        public void SetCharacterRenderTexture(RenderTexture rt)
+        {
+            if (_characterRawImage == null) return;
+            _characterRawImage.texture = rt;
+            _characterRawImage.gameObject.SetActive(true);
+            if (_characterImage != null) _characterImage.gameObject.SetActive(false);
             if (_placeholderBg != null) _placeholderBg.gameObject.SetActive(false);
             ShowSlot(true);
         }
@@ -154,6 +179,7 @@ namespace NGames.UI
         {
             if (_placeholderBg == null) return;
             _characterImage.gameObject.SetActive(false);
+            if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
 
             _placeholderBg.color = new Color(
                 accentColor.r * 0.18f, accentColor.g * 0.18f, accentColor.b * 0.18f, 0.95f);
@@ -174,6 +200,7 @@ namespace NGames.UI
             if (!show)
             {
                 if (_characterImage  != null) _characterImage.gameObject.SetActive(false);
+                if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
                 if (_placeholderBg   != null) _placeholderBg.gameObject.SetActive(false);
             }
         }

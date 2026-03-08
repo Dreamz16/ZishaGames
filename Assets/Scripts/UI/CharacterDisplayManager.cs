@@ -30,6 +30,10 @@ namespace NGames.UI
         };
 
         private DialogueView _view;
+        private GameObject _active3DCharacter;
+        private Camera _charCamera;
+        private RenderTexture _charRenderTexture;
+        private readonly Vector3 _stagePosition = new Vector3(100f, 100f, 0f);
 
         private void Start()
         {
@@ -70,14 +74,80 @@ namespace NGames.UI
             ShowCharacter(playerName);
         }
 
-        private void OnEnd(StoryEndedEvent _)        => _view?.ShowCharacterImage(false);
-        private void OnScene(SceneTransitionEvent _) => _view?.ShowCharacterImage(false);
+        private void OnEnd(StoryEndedEvent _)
+        {
+            _view?.ShowCharacterImage(false);
+            Destroy3DCharacter();
+        }
+
+        private void OnScene(SceneTransitionEvent _)
+        {
+            _view?.ShowCharacterImage(false);
+            Destroy3DCharacter();
+        }
+
+        private void Destroy3DCharacter()
+        {
+            if (_active3DCharacter != null)
+            {
+                Destroy(_active3DCharacter);
+                _active3DCharacter = null;
+            }
+        }
+
+        private void SetupStage()
+        {
+            if (_charCamera != null) return;
+            
+            var camGo = new GameObject("CharacterStageCamera");
+            camGo.transform.position = _stagePosition + new Vector3(0f, 0f, -10f); 
+            _charCamera = camGo.AddComponent<Camera>();
+            _charCamera.clearFlags = CameraClearFlags.SolidColor;
+            _charCamera.backgroundColor = new Color(0, 0, 0, 0); // Transparent
+            _charCamera.orthographic = true;
+            _charCamera.orthographicSize = 2.5f; // zoom level for portrait
+            _charCamera.cullingMask = 1 << 31; // Render only the character layer
+            
+            _charRenderTexture = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32);
+            _charCamera.targetTexture = _charRenderTexture;
+        }
+
+        private void SetLayerRecursively(GameObject obj, int newLayer)
+        {
+            obj.layer = newLayer;
+            foreach (Transform child in obj.transform)
+            {
+                SetLayerRecursively(child.gameObject, newLayer);
+            }
+        }
 
         private void ShowCharacter(string name)
         {
             if (_view == null) return;
 
             var key    = name.ToLowerInvariant();
+
+            // -- NEW 3D CHARACTER LOGIC --
+            var prefab3D = Resources.Load<GameObject>($"Characters3D/{key}");
+            if (prefab3D != null)
+            {
+                Destroy3DCharacter();
+                SetupStage();
+                
+                // Spawn character far away at the hidden stage
+                _active3DCharacter = Instantiate(prefab3D, _stagePosition + new Vector3(0, -1.2f, 3f), Quaternion.identity);
+                SetLayerRecursively(_active3DCharacter, 31);
+                
+                // Route the render texture to the dialogue UI
+                _view.SetCharacterRenderTexture(_charRenderTexture);
+                return;
+            }
+            else
+            {
+                Destroy3DCharacter();
+            }
+            // -- END NEW 3D CHARACTER LOGIC --
+            
             var tex    = Resources.Load<Texture2D>($"Characters/{key}");
 
             if (tex != null)

@@ -46,6 +46,8 @@ namespace NGames.UI
         private TextMeshProUGUI  _sceneLabel;
         private CanvasGroup      _sceneGroup;
 
+        private GameObject _active3DScene;
+
         private Coroutine _bgCoroutine;
         private Coroutine _nameCoroutine;
         private Coroutine _kenBurnsCoroutine;
@@ -98,6 +100,69 @@ namespace NGames.UI
 
             if (_bgCoroutine   != null) StopCoroutine(_bgCoroutine);
             if (_nameCoroutine != null) StopCoroutine(_nameCoroutine);
+
+            // Fetch the Canvas Background Parent to toggle its overall visibility
+            var canvas = FindFirstObjectByType<Canvas>()?.transform;
+            Transform bgParent = canvas != null ? canvas.Find("Background") : null;
+
+            // -- NEW 3D SCENE LOGIC --
+            var prefab3D = Resources.Load<GameObject>($"Scenes3D/{key}");
+            if (prefab3D != null)
+            {
+                if (_active3DScene != null) Destroy(_active3DScene);
+                _active3DScene = Instantiate(prefab3D);
+                
+                // Set the correct layer (Default)
+                _active3DScene.layer = 0;
+
+                // Top-align the scene logic
+                SpriteRenderer sr = _active3DScene.GetComponentInChildren<SpriteRenderer>();
+                Camera mainCam = Camera.main;
+                if (sr != null && mainCam != null)
+                {
+                    float camHalfHeight = mainCam.orthographic ? mainCam.orthographicSize : Mathf.Tan(mainCam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 10f;
+                    float spriteHalfHeight = sr.bounds.extents.y;
+                    float topOffset = camHalfHeight - spriteHalfHeight;
+                    
+                    _active3DScene.transform.position = new Vector3(mainCam.transform.position.x, mainCam.transform.position.y + topOffset, 10f);
+                }
+                else
+                {
+                    _active3DScene.transform.position = new Vector3(0, 0, 10f);
+                }
+                
+                // Hide 2D elements and the opaque canvas background completely
+                if (_bgSprite != null) _bgSprite.gameObject.SetActive(false);
+                if (_bgTop != null) _bgTop.gameObject.SetActive(false);
+                if (_bgBot != null) _bgBot.gameObject.SetActive(false);
+                if (bgParent != null)
+                {
+                    var bgImg = bgParent.GetComponent<Image>();
+                    if (bgImg != null) bgImg.enabled = false;
+                }
+                
+                if (_kenBurnsCoroutine != null) StopCoroutine(_kenBurnsCoroutine);
+                
+                // Still show the name card
+                _nameCoroutine = StartCoroutine(ShowSceneName(ev.SceneName));
+                return;
+            }
+            else
+            {
+                // If we fallback to 2D, restore the base canvas background
+                if (bgParent != null)
+                {
+                    var bgImg = bgParent.GetComponent<Image>();
+                    if (bgImg != null) bgImg.enabled = true;
+                }
+                
+                if (_active3DScene != null)
+                {
+                    Destroy(_active3DScene);
+                    _active3DScene = null;
+                }
+            }
+            // -- END NEW 3D SCENE LOGIC --
 
             var bgTex    = Resources.Load<Texture2D>($"Backgrounds/{key}");
             var bgSprite = bgTex != null
