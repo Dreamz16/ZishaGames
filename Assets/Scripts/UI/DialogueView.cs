@@ -9,15 +9,13 @@ using UnityEngine.UI;
 namespace NGames.UI
 {
     /// <summary>
-    /// Pure UI component — only reads data pushed to it by DialogueController.
-    /// No direct coupling to NarrativeManager or GameEventBus.
+    /// Unified bottom panel: character portrait on left, dialogue text or choices on right.
+    /// No speaker name or accent bar.
     /// </summary>
     public class DialogueView : MonoBehaviour
     {
         [Header("Dialogue")]
         [SerializeField] private TextMeshProUGUI _dialogueText;
-        [SerializeField] private TextMeshProUGUI _speakerNameText;
-        [SerializeField] private Image           _speakerPortrait;
         [SerializeField] private GameObject      _dialoguePanel;
 
         [Header("Choices")]
@@ -25,24 +23,31 @@ namespace NGames.UI
         [SerializeField] private ChoiceButtonView _choiceButtonPrefab;
 
         [Header("End Screen")]
-        [SerializeField] private GameObject      _endPanel;
-        [SerializeField] private Button          _nextEpisodeButton;
-        [SerializeField] private Button          _mainMenuButton;
-
-        private readonly List<ChoiceButtonView> _choiceButtons = new();
+        [SerializeField] private GameObject _endPanel;
+        [SerializeField] private Button     _nextEpisodeButton;
+        [SerializeField] private Button     _mainMenuButton;
 
         [Header("Advance Indicator")]
         [SerializeField] private GameObject _advanceIndicator;
 
-        private CanvasGroup _panelCg;
-        private Coroutine   _textAnimRoutine;
+        private readonly List<ChoiceButtonView> _choiceButtons = new();
+
+        // Character portrait — created at runtime
+        private Image         _characterImage;
+        private RectTransform _dialogueRt;
+        private CanvasGroup   _panelCg;
+        private Coroutine     _textAnimRoutine;
+
+        // Anchor presets for dialogue text
+        private static readonly Vector2 TextAnchorMinFull    = new(0.02f, 0.06f);
+        private static readonly Vector2 TextAnchorMaxFull    = new(0.97f, 0.92f);
+        private static readonly Vector2 TextAnchorMinWithChar = new(0.27f, 0.06f);
+        private static readonly Vector2 TextAnchorMaxWithChar = new(0.97f, 0.92f);
 
         private void Awake()
         {
-            // Self-wire if Inspector references are missing
-            if (_dialogueText    == null) _dialogueText    = FindTMP("DialogueText");
-            if (_speakerNameText == null) _speakerNameText = FindTMP("SpeakerRow/SpeakerName");
-            if (_speakerNameText == null) _speakerNameText = FindTMP("SpeakerName");
+            // Self-wire
+            if (_dialogueText == null)     _dialogueText     = FindTMP("DialogueText");
             if (_choicesContainer == null)
             {
                 var t = transform.parent?.Find("ChoicesContainer");
@@ -64,8 +69,31 @@ namespace NGames.UI
                 if (t != null) _advanceIndicator = t.gameObject;
             }
 
-            // Ensure a CanvasGroup exists on this panel for text entrance fades
             _panelCg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+
+            if (_dialogueText != null)
+                _dialogueRt = _dialogueText.GetComponent<RectTransform>();
+
+            BuildCharacterImage();
+        }
+
+        private void BuildCharacterImage()
+        {
+            var go = new GameObject("CharacterPortrait");
+            go.transform.SetParent(transform, false);
+            go.transform.SetAsFirstSibling();
+
+            _characterImage              = go.AddComponent<Image>();
+            _characterImage.preserveAspect = true;
+            _characterImage.raycastTarget  = false;
+            _characterImage.color          = Color.white;
+
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f,    0f);
+            rt.anchorMax = new Vector2(0.25f, 1f);
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            go.SetActive(false);
         }
 
         private TextMeshProUGUI FindTMP(string childName)
@@ -74,13 +102,32 @@ namespace NGames.UI
             return t != null ? t.GetComponent<TextMeshProUGUI>() : null;
         }
 
+        // ── Character portrait ─────────────────────────────────────────────────
+        public void SetCharacterSprite(Sprite sprite)
+        {
+            if (_characterImage == null) return;
+            _characterImage.sprite = sprite;
+        }
+
+        public void ShowCharacterImage(bool show)
+        {
+            if (_characterImage == null) return;
+            _characterImage.gameObject.SetActive(show);
+            if (_dialogueRt == null) return;
+            _dialogueRt.anchorMin = show ? TextAnchorMinWithChar : TextAnchorMinFull;
+            _dialogueRt.anchorMax = show ? TextAnchorMaxWithChar : TextAnchorMaxFull;
+        }
+
         // ── Dialogue ───────────────────────────────────────────────────────────
         public void SetDialogueText(string text)
         {
-            if (_dialogueText != null) _dialogueText.text = text;
+            if (_dialogueText != null)
+            {
+                _dialogueText.gameObject.SetActive(true);
+                _dialogueText.text = text;
+            }
         }
 
-        /// <summary>Fade + micro-slide the dialogue panel in when a new line arrives.</summary>
         public void AnimateLineIn()
         {
             if (_textAnimRoutine != null) StopCoroutine(_textAnimRoutine);
@@ -150,34 +197,29 @@ namespace NGames.UI
             if (_dialogueText != null) _dialogueText.maxVisibleCharacters = int.MaxValue;
         }
 
-        public void SetSpeakerName(string name)
-        {
-            if (_speakerNameText != null)
-            {
-                _speakerNameText.text    = name;
-                _speakerNameText.gameObject.SetActive(!string.IsNullOrEmpty(name));
-            }
-        }
-
-        public void SetPortrait(string portraitKey)
-        {
-            if (_speakerPortrait == null) return;
-            var sprite = Resources.Load<Sprite>($"Portraits/{portraitKey}");
-            _speakerPortrait.sprite = sprite;
-            _speakerPortrait.gameObject.SetActive(sprite != null);
-        }
+        // No-ops kept for compatibility
+        public void SetSpeakerName(string name) { }
+        public void SetPortrait(string portraitKey) { }
 
         // ── Choices ────────────────────────────────────────────────────────────
         public void ShowChoices(List<Choice> choices, Action<int> onChoiceSelected)
         {
             HideChoices();
 
-            // Activate container first so Awake() fires on instantiated children
+            // Hide dialogue text — choices take the right side
+            if (_dialogueText != null) _dialogueText.gameObject.SetActive(false);
+
             _choicesContainer.gameObject.SetActive(true);
 
             for (int i = 0; i < choices.Count; i++)
             {
                 var btn = Instantiate(_choiceButtonPrefab, _choicesContainer);
+
+                // Explicit height so VerticalLayoutGroup (ChildControlHeight=1) has something to work with
+                var le = btn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                le.preferredHeight = 62;
+                le.minHeight       = 48;
+
                 btn.Setup(i, choices[i].text, onChoiceSelected);
                 btn.AnimateIn(i);
                 _choiceButtons.Add(btn);
@@ -191,6 +233,9 @@ namespace NGames.UI
 
             if (_choicesContainer != null)
                 _choicesContainer.gameObject.SetActive(false);
+
+            // Restore dialogue text
+            if (_dialogueText != null) _dialogueText.gameObject.SetActive(true);
         }
 
         // ── End Screen ─────────────────────────────────────────────────────────

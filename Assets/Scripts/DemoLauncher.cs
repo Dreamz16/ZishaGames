@@ -1,4 +1,3 @@
-using NGames.Core.Events;
 using NGames.Core.Narrative;
 using NGames.Core.State;
 using NGames.Episodes;
@@ -36,6 +35,10 @@ public class DemoLauncher : MonoBehaviour
                 return;
             }
         }
+
+        // Player character is always Ishani
+        var gsm = GameStateManager.Instance;
+        if (gsm != null) gsm.SaveData.PlayerName = "Ishani";
 
         await EpisodeLoader.Instance.LoadAndPlayEpisodeAsync(_episode);
     }

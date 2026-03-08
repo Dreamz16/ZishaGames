@@ -41,31 +41,32 @@ namespace NGames.UI
         }
 
         // ── Entrance animation ────────────────────────────────────────────────
+        /// <summary>
+        /// Fade + scale in. No anchoredPosition slide — that would conflict with
+        /// VerticalLayoutGroup which controls position each frame.
+        /// </summary>
         public void AnimateIn(int staggerIndex)
         {
-            _cg.alpha = 0f;
+            _cg.alpha      = 0f;
+            _rt.localScale = new Vector3(0.88f, 0.88f, 1f);
             StartCoroutine(EntranceRoutine(staggerIndex * 0.09f));
         }
 
         private IEnumerator EntranceRoutine(float delay)
         {
-            var basePos = _rt.anchoredPosition;
-            _rt.anchoredPosition = basePos + new Vector2(0f, -28f);
-
             yield return new WaitForSeconds(delay);
 
-            float e = 0f, dur = 0.32f;
-            var startPos = _rt.anchoredPosition;
+            float e = 0f, dur = 0.28f;
             while (e < dur)
             {
                 e += Time.deltaTime;
                 float t = 1f - Mathf.Pow(1f - Mathf.Clamp01(e / dur), 3f); // ease-out cubic
-                _cg.alpha            = t;
-                _rt.anchoredPosition = Vector2.Lerp(startPos, basePos, t);
+                _cg.alpha      = t;
+                _rt.localScale = Vector3.Lerp(new Vector3(0.88f, 0.88f, 1f), Vector3.one, t);
                 yield return null;
             }
-            _cg.alpha            = 1f;
-            _rt.anchoredPosition = basePos;
+            _cg.alpha      = 1f;
+            _rt.localScale = Vector3.one;
         }
 
         // ── Hover / press ─────────────────────────────────────────────────────
