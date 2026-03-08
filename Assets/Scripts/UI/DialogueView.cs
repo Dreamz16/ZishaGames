@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Ink.Runtime;
 using TMPro;
@@ -33,6 +34,9 @@ namespace NGames.UI
         [Header("Advance Indicator")]
         [SerializeField] private GameObject _advanceIndicator;
 
+        private CanvasGroup _panelCg;
+        private Coroutine   _textAnimRoutine;
+
         private void Awake()
         {
             // Self-wire if Inspector references are missing
@@ -59,6 +63,9 @@ namespace NGames.UI
                 var t = transform.Find("AdvanceIndicator");
                 if (t != null) _advanceIndicator = t.gameObject;
             }
+
+            // Ensure a CanvasGroup exists on this panel for text entrance fades
+            _panelCg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
         }
 
         private TextMeshProUGUI FindTMP(string childName)
@@ -71,6 +78,34 @@ namespace NGames.UI
         public void SetDialogueText(string text)
         {
             if (_dialogueText != null) _dialogueText.text = text;
+        }
+
+        /// <summary>Fade + micro-slide the dialogue panel in when a new line arrives.</summary>
+        public void AnimateLineIn()
+        {
+            if (_textAnimRoutine != null) StopCoroutine(_textAnimRoutine);
+            _textAnimRoutine = StartCoroutine(LineEntranceRoutine());
+        }
+
+        private IEnumerator LineEntranceRoutine()
+        {
+            if (_panelCg == null) yield break;
+            var rt = GetComponent<RectTransform>();
+            var basePos = rt != null ? rt.anchoredPosition : Vector2.zero;
+            if (rt != null) rt.anchoredPosition = basePos + new Vector2(0f, -6f);
+            _panelCg.alpha = 0.4f;
+
+            float e = 0f, dur = 0.22f;
+            while (e < dur)
+            {
+                e += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, e / dur);
+                _panelCg.alpha = Mathf.Lerp(0.4f, 1f, t);
+                if (rt != null) rt.anchoredPosition = Vector2.Lerp(basePos + new Vector2(0f, -6f), basePos, t);
+                yield return null;
+            }
+            _panelCg.alpha = 1f;
+            if (rt != null) rt.anchoredPosition = basePos;
         }
 
         public void ShowAdvanceIndicator(bool show)
@@ -141,6 +176,7 @@ namespace NGames.UI
             {
                 var btn = Instantiate(_choiceButtonPrefab, _choicesContainer);
                 btn.Setup(i, choices[i].text, onChoiceSelected);
+                btn.AnimateIn(i);
                 _choiceButtons.Add(btn);
             }
 

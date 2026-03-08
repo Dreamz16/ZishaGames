@@ -79,6 +79,8 @@ namespace NGames.Core.Narrative
                 SetAdvance(NarrativeManager.Instance?.CanContinue == true);
             }
 
+            _view.AnimateLineIn();
+
             if (_config?.AutoAdvanceEnabled == true && !_awaitingChoice)
                 StartCoroutine(AutoAdvance());
         }

@@ -41,12 +41,14 @@ namespace NGames.UI
 
         private Image            _bgTop;
         private Image            _bgBot;
-        private Image            _bgSprite;   // full-screen art layer
+        private Image            _bgSprite;     // full-screen art layer
+        private RectTransform    _bgSpriteRt;   // for Ken Burns
         private TextMeshProUGUI  _sceneLabel;
         private CanvasGroup      _sceneGroup;
 
         private Coroutine _bgCoroutine;
         private Coroutine _nameCoroutine;
+        private Coroutine _kenBurnsCoroutine;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
         private void Awake()
@@ -69,10 +71,10 @@ namespace NGames.UI
                 _bgSprite.raycastTarget  = false;
                 _bgSprite.color          = Color.white;
                 _bgSprite.gameObject.SetActive(false);
-                var artRt = artGo.GetComponent<RectTransform>();
-                artRt.anchorMin = Vector2.zero;
-                artRt.anchorMax = Vector2.one;
-                artRt.offsetMin = artRt.offsetMax = Vector2.zero;
+                _bgSpriteRt = artGo.GetComponent<RectTransform>();
+                _bgSpriteRt.anchorMin = Vector2.zero;
+                _bgSpriteRt.anchorMax = Vector2.one;
+                _bgSpriteRt.offsetMin = _bgSpriteRt.offsetMax = Vector2.zero;
             }
 
             var card = canvas.Find("SceneNameCard");
@@ -103,6 +105,7 @@ namespace NGames.UI
                 : null;
             if (bgSprite != null)
             {
+                if (_kenBurnsCoroutine != null) StopCoroutine(_kenBurnsCoroutine);
                 _bgCoroutine = StartCoroutine(FadeSpriteBackground(bgSprite, 0.7f));
             }
             else
@@ -139,6 +142,30 @@ namespace NGames.UI
             _bgSprite.color = Color.white;
             if (_bgTop != null) _bgTop.gameObject.SetActive(false);
             if (_bgBot != null) _bgBot.gameObject.SetActive(false);
+
+            // Reset and start Ken Burns after fade-in completes
+            if (_bgSpriteRt != null)
+            {
+                _bgSpriteRt.localScale      = Vector3.one;
+                _bgSpriteRt.anchoredPosition = Vector2.zero;
+                _kenBurnsCoroutine = StartCoroutine(KenBurns(_bgSpriteRt));
+            }
+        }
+
+        private IEnumerator KenBurns(RectTransform rt)
+        {
+            var endScale = new Vector3(1.07f, 1.07f, 1f);
+            var endPos   = new Vector2(Random.Range(-20f, 20f), Random.Range(-10f, 10f));
+            const float dur = 28f;
+            float e = 0f;
+            while (e < dur)
+            {
+                e += Time.deltaTime;
+                float t = e / dur;
+                rt.localScale        = Vector3.Lerp(Vector3.one, endScale, t);
+                rt.anchoredPosition  = Vector2.Lerp(Vector2.zero, endPos, t);
+                yield return null;
+            }
         }
 
         private IEnumerator FadeBackground((Color top, Color bot) target, float dur)
