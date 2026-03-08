@@ -31,6 +31,9 @@ namespace NGames.UI
         private (string key, CanvasGroup cg, RectTransform rt)? _leftCard;
         private (string key, CanvasGroup cg, RectTransform rt)? _rightCard;
 
+        private Coroutine _leftFade;
+        private Coroutine _rightFade;
+
         private Transform _leftSlot;
         private Transform _rightSlot;
         private Image     _portraitIcon;
@@ -79,8 +82,8 @@ namespace NGames.UI
             {
                 // Narration — hide all cards
                 _currentSpeaker = "";
-                if (_leftCard.HasValue)  StartCoroutine(Fade(_leftCard.Value.cg,  0f, 0.25f));
-                if (_rightCard.HasValue) StartCoroutine(Fade(_rightCard.Value.cg, 0f, 0.25f));
+                if (_leftCard.HasValue)  { if (_leftFade  != null) StopCoroutine(_leftFade);  _leftFade  = StartCoroutine(Fade(_leftCard.Value.cg,  0f, 0.25f)); }
+                if (_rightCard.HasValue) { if (_rightFade != null) StopCoroutine(_rightFade); _rightFade = StartCoroutine(Fade(_rightCard.Value.cg, 0f, 0.25f)); }
                 return;
             }
 
@@ -161,13 +164,15 @@ namespace NGames.UI
             if (_leftCard.HasValue)
             {
                 bool active = _leftCard.Value.key == _currentSpeaker;
-                StartCoroutine(Fade(_leftCard.Value.cg,  active ? 1f : 0.35f, 0.25f));
+                if (_leftFade != null) StopCoroutine(_leftFade);
+                _leftFade = StartCoroutine(Fade(_leftCard.Value.cg, active ? 1f : 0.20f, 0.3f));
                 StartCoroutine(Scale(_leftCard.Value.rt, active ? 1.04f : 0.96f, 0.2f));
             }
             if (_rightCard.HasValue)
             {
                 bool active = _rightCard.Value.key == _currentSpeaker;
-                StartCoroutine(Fade(_rightCard.Value.cg,  active ? 1f : 0.35f, 0.25f));
+                if (_rightFade != null) StopCoroutine(_rightFade);
+                _rightFade = StartCoroutine(Fade(_rightCard.Value.cg, active ? 1f : 0.20f, 0.3f));
                 StartCoroutine(Scale(_rightCard.Value.rt, active ? 1.04f : 0.96f, 0.2f));
             }
         }

@@ -144,6 +144,8 @@ public static class AutoSetup
         changed |= CreateEpisodeRegistry();
         changed |= CreateChoiceButtonPrefab();
         changed |= CreateBootstrapScene();
+        changed |= CreateMainMenuScene();
+        changed |= CreateAudioFolders();
 
         if (changed)
         {
@@ -488,6 +490,8 @@ public static class AutoSetup
         // ── CharacterDisplayManager + SceneBackgroundController ───────────────
         systems.AddComponent<NGames.UI.CharacterDisplayManager>();
         systems.AddComponent<NGames.UI.SceneBackgroundController>();
+        systems.AddComponent<NGames.Core.Audio.AudioManager>();
+        systems.AddComponent<NGames.UI.PauseMenuController>();
 
         // Save scene
         EditorSceneManager.SaveScene(scene, scenePath);
@@ -549,6 +553,148 @@ public static class AutoSetup
             prop.objectReferenceValue = value;
             so.ApplyModifiedPropertiesWithoutUndo();
         }
+    }
+
+    // ── Audio resource folders ────────────────────────────────────────────────
+    static bool CreateAudioFolders()
+    {
+        bool changed = false;
+        if (!Directory.Exists("Assets/Resources/Audio/Music")) { Directory.CreateDirectory("Assets/Resources/Audio/Music"); changed = true; }
+        if (!Directory.Exists("Assets/Resources/Audio/SFX"))   { Directory.CreateDirectory("Assets/Resources/Audio/SFX");   changed = true; }
+        return changed;
+    }
+
+    // ── Main Menu Scene ───────────────────────────────────────────────────────
+    static bool CreateMainMenuScene()
+    {
+        const string scenePath = "Assets/Scenes/MainMenu.unity";
+        if (File.Exists(scenePath)) return false;
+
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+        // Camera
+        var camGo = new GameObject("Main Camera");
+        camGo.tag = "MainCamera";
+        var cam = camGo.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.04f, 0.02f, 0.12f);
+        cam.orthographic = true;
+
+        // EventSystem
+        var esGo = new GameObject("EventSystem");
+        esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+        esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+
+        // Canvas
+        var canvasGo = new GameObject("Canvas");
+        var canvas   = canvasGo.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        var scaler = canvasGo.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight  = 0.5f;
+        canvasGo.AddComponent<GraphicRaycaster>();
+
+        // Background
+        var bgGo = new GameObject("Background");
+        bgGo.transform.SetParent(canvasGo.transform, false);
+        bgGo.AddComponent<Image>().color = new Color(0.04f, 0.02f, 0.12f);
+        FullStretch(bgGo);
+
+        var topHalf = new GameObject("TopHalf");
+        topHalf.transform.SetParent(bgGo.transform, false);
+        topHalf.AddComponent<Image>().color = new Color(0.08f, 0.04f, 0.20f);
+        var thRt = topHalf.GetComponent<RectTransform>();
+        thRt.anchorMin = new Vector2(0, 0.5f); thRt.anchorMax = Vector2.one;
+        thRt.offsetMin = thRt.offsetMax = Vector2.zero;
+
+        // Title
+        var titleGo = MakeTMP(canvasGo, "Title", "Stone of Commitment", 60,
+            new Color(0.96f, 0.88f, 0.60f), new Vector2(0.10f, 0.70f), new Vector2(0.90f, 0.90f));
+        titleGo.GetComponent<TextMeshProUGUI>().fontStyle = TMPro.FontStyles.Bold;
+        titleGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Center;
+
+        var subGo = MakeTMP(canvasGo, "Subtitle",
+            "A consent-first romantasy set along the Silk Road", 22,
+            new Color(0.72f, 0.66f, 0.90f), new Vector2(0.15f, 0.62f), new Vector2(0.85f, 0.70f));
+        subGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Center;
+
+        // Divider
+        var divGo = new GameObject("Divider");
+        divGo.transform.SetParent(canvasGo.transform, false);
+        divGo.AddComponent<Image>().color = new Color(0.55f, 0.35f, 0.90f, 0.45f);
+        var divRt = divGo.GetComponent<RectTransform>();
+        divRt.anchorMin = new Vector2(0.35f, 0.612f); divRt.anchorMax = new Vector2(0.65f, 0.617f);
+        divRt.offsetMin = divRt.offsetMax = Vector2.zero;
+
+        // Buttons
+        var newGameGo = MakeMenuButton(canvasGo, "NewGameButton", "New Game",
+            new Vector2(0.35f, 0.46f), new Vector2(0.65f, 0.55f), new Color(0.28f, 0.16f, 0.56f));
+
+        var continueGo = MakeMenuButton(canvasGo, "ContinueButton", "Continue",
+            new Vector2(0.35f, 0.35f), new Vector2(0.65f, 0.44f), new Color(0.18f, 0.10f, 0.38f));
+
+        var quitGo = MakeMenuButton(canvasGo, "QuitButton", "Quit",
+            new Vector2(0.35f, 0.20f), new Vector2(0.65f, 0.29f), new Color(0.25f, 0.06f, 0.06f));
+
+        // Version
+        MakeTMP(canvasGo, "Version", "v0.1.0", 14, new Color(0.45f, 0.42f, 0.55f),
+            new Vector2(0.01f, 0.01f), new Vector2(0.15f, 0.05f));
+
+        // MainMenuController
+        var ctrl = canvasGo.AddComponent<NGames.UI.MainMenuController>();
+        SetSerializedField(ctrl, "_newGameBtn", newGameGo.GetComponent<Button>());
+        SetSerializedField(ctrl, "_continueBtn", continueGo.GetComponent<Button>());
+        SetSerializedField(ctrl, "_quitBtn", quitGo.GetComponent<Button>());
+
+        EditorSceneManager.SaveScene(scene, scenePath);
+        Debug.Log("[AutoSetup] Created MainMenu scene.");
+        return true;
+    }
+
+    static GameObject MakeMenuButton(GameObject parent, string name, string label,
+        Vector2 anchorMin, Vector2 anchorMax, Color color)
+    {
+        var go  = new GameObject(name);
+        go.transform.SetParent(parent.transform, false);
+        var img = go.AddComponent<Image>();
+        img.color = color;
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        var rt = go.GetComponent<RectTransform>();
+        rt.anchorMin = anchorMin; rt.anchorMax = anchorMax;
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        var lblGo = new GameObject("Label");
+        lblGo.transform.SetParent(go.transform, false);
+        var tmp = lblGo.AddComponent<TextMeshProUGUI>();
+        tmp.text      = label;
+        tmp.fontSize  = 24;
+        tmp.color     = Color.white;
+        tmp.alignment = TextAlignmentOptions.Center;
+        var lblRt = lblGo.GetComponent<RectTransform>();
+        lblRt.anchorMin = Vector2.zero; lblRt.anchorMax = Vector2.one;
+        lblRt.offsetMin = lblRt.offsetMax = Vector2.zero;
+        return go;
+    }
+
+    [UnityEditor.MenuItem("NGames/Patch Bootstrap (Audio + Pause)")]
+    public static void PatchBootstrapAudioPause()
+    {
+        const string scenePath = "Assets/Scenes/Bootstrap.unity";
+        var scene = EditorSceneManager.OpenScene(scenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
+
+        var systems = GameObject.Find("_Systems");
+        if (systems == null) { Debug.LogError("[AutoSetup] _Systems not found."); return; }
+
+        if (systems.GetComponent<NGames.Core.Audio.AudioManager>() == null)
+            systems.AddComponent<NGames.Core.Audio.AudioManager>();
+
+        if (systems.GetComponent<NGames.UI.PauseMenuController>() == null)
+            systems.AddComponent<NGames.UI.PauseMenuController>();
+
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[AutoSetup] Patched Bootstrap with AudioManager + PauseMenuController.");
     }
 }
 #endif
