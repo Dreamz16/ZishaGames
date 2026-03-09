@@ -385,6 +385,12 @@ function convertTweeToInk(src, episodeId) {
     }
     if (allVars.size > 0) inkParts.push('');
 
+    // Entry point divert — Ink starts at the top of the file; without this
+    // it hits only VAR declarations and immediately ends.
+    const entryKnot = slugify(startName);
+    inkParts.push(`-> ${entryKnot}`);
+    inkParts.push('');
+
     // Find the start passage and put it first
     const startPassage = passages.find(p => p.name === startName);
     const otherPassages = passages.filter(

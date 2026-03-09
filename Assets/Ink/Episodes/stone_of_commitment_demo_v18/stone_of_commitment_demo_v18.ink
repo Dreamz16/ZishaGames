@@ -95,6 +95,8 @@ VAR fortuneGroveAnswer = "Fortune"
 VAR irlPlayer = 0
 VAR drinkFinished = 0
 
+-> opening
+
 === opening ===
 // ═══ STONE OF COMMITMENTVanquish Death ═══
 An RPG about trust. The slow burn kind.
