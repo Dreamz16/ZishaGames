@@ -2362,22 +2362,52 @@ Marcus, across the fire, has been watching the entire exchange. He says nothing.
 Your phone vibrates. Not a game notification. A DM.
 
 {
-    - jeff >= 6>><span style="color:#60a5fa;">Byung-Ho:</span> <span style="color:#d1d5db;">Hey. Good session tonight. Your character is really coming into her own. I mean that. She's ! just good at things. She's interesting.</span><<elseif jeff >= 3>><span style="color:#60a5fa;">Byung-Ho:</span> <span style="color:#d1d5db;">hey. good session tonight. your character is really coming into her own. I've been thinking about the pomegranate scene.</span><<else>><span style="color:#60a5fa;">Byung-Ho:</span> <span style="color:#d1d5db;">hey. good session tonight. your character is really coming into her own.</span><</if:
-    ~ jeff = jeff + 1
-    Ishani:FBP: Thanks! The desert sequence was intense. I didn't expect the question scene.
-    Byung-Ho: yeah Lawrence kind of went off script there. i had something more strategic planned but the scene just went somewhere and i followed it.
-    >Ishani:>FBP:> It felt very in character. Lawrence has been different since Highwind.
-    Byung-Ho: lol yeah he has. i think the character is just doing his thing. vampires gonna vampire you know.
-    Byung-Ho: it's all rp though. i hope that's cool. like i'm not trying to make it weird.
-    >Ishani:>FBP:> It's not weird. I like where the story is going.
-    Byung-Ho: cool. cool cool cool. yeah me too.
-    Byung-Ho: the ankle thing was maybe a bit much though lol. i couldn't tell if that was too forward or if it worked
-    >Ishani:>FBP:> It worked.
-    Byung-Ho: oh. good. that's. good to know.
-    Byung-Ho: anyway. see you next session. get some sleep, the caves are going to be rough.
-    He signed off with "see you next session." Not "goodnight." Not "sweet dreams." "See you next session." The careful, lowercase language of a man who is testing whether he still knows how to make someone feel something, using a fictional character as a safety net so that if it doesn't work, it was just RP. Lawrence is not Byung-Ho. But the hand at the elbow was not entirely Lawrence's either, and the question about whether the ankle thing was "too forward" is a question a software developer asks, not a thousand-year-old vampire. He is using the game the way someone uses a practice room: to rehearse the version of himself he's afraid doesn't exist anymore, after the breakup ate the part of him that believed he was worth wanting.
+    - jeff >= 6:
+    Byung-Ho: Hey. Good session tonight. Your character is really coming into her own. I mean that. She's not just good at things. She's interesting.
+    - jeff >= 3:
+    Byung-Ho: hey. good session tonight. your character is really coming into her own. I've been thinking about the pomegranate scene.
+    - else:
+    Byung-Ho: hey. good session tonight. your character is really coming into her own.
+}
+~ jeff = jeff + 1
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+Thanks! The desert sequence was intense. I didn't expect the question scene.
+Byung-Ho: yeah Lawrence kind of went off script there. i had something more strategic planned but the scene just went somewhere and i followed it.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+It felt very in character. Lawrence has been different since Highwind.
+Byung-Ho: lol yeah he has. i think the character is just doing his thing. vampires gonna vampire you know.
+Byung-Ho: it's all rp though. i hope that's cool. like i'm not trying to make it weird.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+It's not weird. I like where the story is going.
+Byung-Ho: cool. cool cool cool. yeah me too.
+Byung-Ho: the ankle thing was maybe a bit much though lol. i couldn't tell if that was too forward or if it worked
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+It worked.
+Byung-Ho: oh. good. that's. good to know.
+Byung-Ho: anyway. see you next session. get some sleep, the caves are going to be rough.
+He signed off with "see you next session." Not "goodnight." Not "sweet dreams." "See you next session." The careful, lowercase language of a man who is testing whether he still knows how to make someone feel something, using a fictional character as a safety net so that if it doesn't work, it was just RP. Lawrence is not Byung-Ho. But the hand at the elbow was not entirely Lawrence's either, and the question about whether the ankle thing was "too forward" is a question a software developer asks, not a thousand-year-old vampire. He is using the game the way someone uses a practice room: to rehearse the version of himself he's afraid doesn't exist anymore, after the breakup ate the part of him that believed he was worth wanting.
 
-    + [Reach the Jade Gate outpost.] -> act6_jadegate
++ [Reach the Jade Gate outpost.] -> act6_jadegate
 
 === act6_flamingmountains ===
 // 📍 Flaming Mountains · Mutou Valley Approach
@@ -3808,7 +3838,10 @@ Marcus takes out his lute. For the first time, he plays in Mo Stór. Quiet. Back
 
 Tiberius stops what he's doing and listens for four bars. Then resumes. He used to be a musician. He knows what he's hearing. The way he sets down the glass afterward is gentler than it needs to be.
 
-+ [Marcus has asked to speak with you. Privately. Before the road.] -> marcus_counteroath
+{
+    - marcus >= 5:
+    + [Marcus has asked to speak with you. Privately. Before the road.] -> marcus_counteroath
+}
 + [Take the Samarkand road. Resupply, then the desert.] -> bridge_samarkand
 
 === marcus_counteroath ===
@@ -4047,7 +4080,10 @@ Lawrence walks beside you without speaking. The silence between people who've st
 + ['About Sky's warning. The desert and not seeing where you're going.'] -> bridge_saltflats_sky
 + ['About whether this is worth it. Not the mission. The cost.'] -> bridge_saltflats_cost
 + ['About you, actually.'] -> bridge_saltflats_you
-+ [(Fang is at the edge of the flat at dawn. She has something to say.)] -> bridge_saltflats_fangdawn
+{
+    - fang >= 4:
+    + [(Fang is at the edge of the flat at dawn. She has something to say.)] -> bridge_saltflats_fangdawn
+}
 
 === bridge_samarkand_arrival ===
 // 📍 Samarkand Gates · Day 7 · Dusk
@@ -4345,14 +4381,26 @@ Clare: Like actually amazing. I was watching the replay and my daughter walked i
 + ['Thanks Clare. That means a lot coming from you.'] -> irl_clare_chat1_direct
 
 === irl_clare_chat1_kid ===
->Ishani:>FBP:> Your daughter sounds like she has good judgment.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+Your daughter sounds like she has good judgment.
 Clare: She's 12 going on 45. Hold on my oldest just informed me he needs a costume for tomorrow
 Clare: Ok I'm back. He needs to be a "historical figure" and I said Marcus and he said "mom that's a bear" and now I have to explain shapeshifting at 10pm on a school night
 Clare: Anyway lol. How are you doing? Like actually doing. The game gets intense and sometimes I forget to check in with real people
 + ['I'm good. Tired. The Samarkand market was a lot.'] -> irl_clare_chat2
 
 === irl_clare_chat1_nr ===
->Ishani:>FBP:> A badass? I literally stepped back and let everyone else finish.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+A badass? I literally stepped back and let everyone else finish.
 Clare: Yeah. That's the badass part.
 Clare: I've played games for years where stepping back = failure. You stepped back and the party WORKED BETTER. That's not quitting. That's trust.
 Clare: Sorry that was intense lol. My kids are in bed and I have Opinions after 9pm
@@ -4360,18 +4408,36 @@ Clare: How are you doing though? Like actually?
 + ['I'm good. Tired. The Samarkand market was a lot.'] -> irl_clare_chat2
 
 === irl_clare_chat1_direct ===
->Ishani:>FBP:> Thanks Clare. That means a lot coming from you.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+Thanks Clare. That means a lot coming from you.
 Clare: Oh stop. I just hit things with swords and make jokes about it.
 Clare: Actually no don't stop. I never get compliments that aren't from my kids' teachers telling me my son "has a lot of energy" which is code for "he broke something again"
 Clare: How are you doing? We're about to hit the desert and I want to make sure my people are good before things get sandy
 + ['I'm good. Tired. The Samarkand market was a lot.'] -> irl_clare_chat2
 
 === irl_clare_chat2 ===
->Ishani:>FBP:> I'm good. Tired. The Samarkand market was a lot.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+I'm good. Tired. The Samarkand market was a lot.
 Clare: RIGHT?? I spent an hour in the swordsmiths' quarter and forgot I had children
 Clare: This game does that to me. I log on for an hour and suddenly it's midnight and the dog needs to go out and I'm emotionally invested in a werewolf's sword maintenance
 Clare: Is that weird? That might be weird.
->Ishani:>FBP:> It's not weird. Or if it is, we're both weird.
+{
+    - nameRevealed:
+    Ishani:
+    - else:
+    FBP:
+}
+It's not weird. Or if it is, we're both weird.
 Clare: Deal. Weird together.
 Clare: Ok I gotta go. My youngest just yelled "MOM THE DOG DID A THING" which is never good
 Clare: Stay safe in the desert. I mean it. 💛
@@ -4539,7 +4605,14 @@ She bumps your shoulder with hers. Once. Brief. A language she trusts more than 
     - jeff >= 9:
     Byung-Ho: see you next session.
     Byung-Ho: I mean that literally. Not as a figure of speech.
-    Byung-Ho: {irlPlayer}. FBP. I hope that's okay to say.
+    Byung-Ho:
+    {
+        - nameRevealed:
+        {irlPlayer}.
+        - else:
+        FBP.
+    }
+    I hope that's okay to say.
     He used your name at the start. Not the character's name. Your name, capitalized, at the front of a sentence that had nowhere to hide. You read it twice. You put the phone face-down and it lands on the table with a sound that is louder than it should be in a quiet room.
 
     You are aware that you are smiling. You are aware that you are aware of it. You are aware that none of this is about Lawrence.
@@ -6862,11 +6935,9 @@ Fang is already on the floor beside Ihwa -- not saying anything, not performing 
 Lawrence is standing where he lowered his hand at Geori 11. He has been standing there since the offering. He does not know what to do next. This is a condition he has not been in for approximately a thousand years.
 
 The wolf puppy crosses the ceremony floor. It sits at Lawrence's feet. It was not invited. It does not ask permission. It simply sits.
-{
-    - familiarSignalCount >= 7>><<journal "Wolf Puppy: Signal Seven" "It crossed the ceremony floor && sat at Lawrence's feet without being invited. The last signal. The old magic in him has settled." "familiar arc complete">><</if:
 
-    + [Stay the night. (Optional.)] -> act10_night_optional
-    + [The one exchange that matters, then the road.] -> act11_net_arrival
++ [Stay the night. (Optional.)] -> act10_night_optional
++ [The one exchange that matters, then the road.] -> act11_net_arrival
 
 === act10_night_optional ===
 

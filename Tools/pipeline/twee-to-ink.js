@@ -133,8 +133,40 @@ function extractVarDeclarations(passages) {
 const SKIP_NAMES = /^(StoryTitle|StoryData|StorySettings|StoryMenu|StoryShare|StoryAuthor|StoryBanner|StoryCaption|StoryInit|StoryVars|-webkit)/i;
 function shouldSkip(name) { return SKIP_NAMES.test(name); }
 
+// ── Expand inline <<if>>..<<elseif>>..<<else>>..<</if>> to separate lines ──
+// SugarCube allows entire if-chains on one line; Ink requires line-per-clause.
+function expandInlineConditionals(lines) {
+    // Regex that matches <<macro ...>> without breaking on >= <= operators:
+    // uses negative lookahead (?!>>) so it doesn't stop early at > inside conditions
+    const IF_RE      = /(<<if\s+(?:(?!>>)[\s\S])*>>)/g;
+    const ELSEIF_RE  = /(<<elseif\s+(?:(?!>>)[\s\S])*>>)/g;
+    const ELSE_RE    = /(<<else>>)/g;
+    const ENDIF_RE   = /(<\/if>>|<<\/if>>)/g;
+
+    const out = [];
+    for (const line of lines) {
+        const t = line.trim();
+        // Only expand if the line contains both an opening <<if and a closing/else tag
+        if (/<<if\s/.test(t) && (/<\/if>>/.test(t) || /<<\/if>>/.test(t) || /<<elseif\s/.test(t))) {
+            const expanded = t
+                .replace(IF_RE,     '\n$1\n')
+                .replace(ELSEIF_RE, '\n$1\n')
+                .replace(ELSE_RE,   '\n$1\n')
+                .replace(ENDIF_RE,  '\n$1\n');
+            for (const part of expanded.split('\n')) {
+                const p = part.trim();
+                if (p) out.push(p);
+            }
+        } else {
+            out.push(line);
+        }
+    }
+    return out;
+}
+
 // ── Convert a passage body to Ink lines ───────────────────────────────────
 function processBody(bodyLines) {
+    bodyLines = expandInlineConditionals(bodyLines);
     const out = [];
     let ifDepth = 0;
     const ind = () => '    '.repeat(ifDepth);
