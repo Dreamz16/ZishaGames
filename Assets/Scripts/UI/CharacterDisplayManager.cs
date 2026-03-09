@@ -101,6 +101,16 @@ namespace NGames.UI
                 _slotKey[targetSlot] = key;
                 ShowCharacterInSlot(ev.SpeakerName, targetSlot);
             }
+            else
+            {
+                // Character already assigned — narrator may have hidden the slot; re-show it.
+                _view?.ShowCharacterSlot(targetSlot, true);
+            }
+
+            // Also restore the other occupied slot if narrator hid it.
+            int other = 1 - targetSlot;
+            if (_slotKey[other] != null)
+                _view?.ShowCharacterSlot(other, true);
 
             _activeSlot = targetSlot;
             RefreshAlphas();
