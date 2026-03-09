@@ -168,41 +168,42 @@ namespace NGames.UI
             _nameplate = new GameObject("SpeakerNameplate");
             _nameplate.transform.SetParent(transform, false);
             _nameplateRt = _nameplate.AddComponent<RectTransform>();
-            _nameplateRt.anchorMin = new Vector2(0.02f, 0.86f);
-            _nameplateRt.anchorMax = new Vector2(0.44f, 0.99f);
+            // Default: bottom of left character slot (slot 0: x 0–22%, bottom 12%)
+            _nameplateRt.anchorMin = new Vector2(0f, 0f);
+            _nameplateRt.anchorMax = new Vector2(0.22f, 0.12f);
             _nameplateRt.offsetMin = _nameplateRt.offsetMax = Vector2.zero;
             _nameplate.SetActive(false);
 
             _nameplateBg = _nameplate.AddComponent<Image>();
             _nameplateBg.raycastTarget = false;
-            _nameplateBg.color = new Color(0.04f, 0.02f, 0.12f, 0.94f);
+            _nameplateBg.color = new Color(0.04f, 0.02f, 0.12f, 0.92f);
 
-            // Left accent bar
+            // Top accent bar (separator between portrait and name)
             var barGo = new GameObject("AccentBar");
             barGo.transform.SetParent(_nameplate.transform, false);
             _nameplateBar = barGo.AddComponent<Image>();
             _nameplateBar.raycastTarget = false;
             var barRt = barGo.GetComponent<RectTransform>();
-            barRt.anchorMin = Vector2.zero;
-            barRt.anchorMax = new Vector2(0f, 1f);
-            barRt.offsetMin = Vector2.zero;
-            barRt.offsetMax = new Vector2(5f, 0f);
+            barRt.anchorMin = new Vector2(0f, 1f);
+            barRt.anchorMax = Vector2.one;
+            barRt.offsetMin = new Vector2(0f, -3f);
+            barRt.offsetMax = Vector2.zero;
 
-            // Name text
+            // Name text — centred within the slot
             var labelGo = new GameObject("NameLabel");
             labelGo.transform.SetParent(_nameplate.transform, false);
             _nameplateLabel = labelGo.AddComponent<TextMeshProUGUI>();
-            _nameplateLabel.alignment     = TextAlignmentOptions.MidlineLeft;
+            _nameplateLabel.alignment     = TextAlignmentOptions.Center;
             _nameplateLabel.fontStyle     = FontStyles.Bold;
-            _nameplateLabel.fontSize      = 15;
+            _nameplateLabel.fontSize      = 13;
             _nameplateLabel.color         = Color.white;
             _nameplateLabel.raycastTarget = false;
             _nameplateLabel.overflowMode  = TextOverflowModes.Ellipsis;
             var labelRt = labelGo.GetComponent<RectTransform>();
             labelRt.anchorMin = Vector2.zero;
             labelRt.anchorMax = Vector2.one;
-            labelRt.offsetMin = new Vector2(12f, 3f);
-            labelRt.offsetMax = new Vector2(-4f, -3f);
+            labelRt.offsetMin = new Vector2(4f, 2f);
+            labelRt.offsetMax = new Vector2(-4f, -2f);
         }
 
         private void BuildPanelAccentLine()
@@ -220,8 +221,8 @@ namespace NGames.UI
             rt.offsetMax = Vector2.zero;
         }
 
-        /// <summary>Show the speaker nameplate with the character's accent colour.</summary>
-        public void SetSpeakerNameplate(string name, Color accentColor, bool rightAligned = false)
+        /// <summary>Show the speaker nameplate at the bottom of their character card slot.</summary>
+        public void SetSpeakerNameplate(string name, Color accentColor, bool rightSlot = false)
         {
             if (_nameplate == null) return;
 
@@ -236,7 +237,7 @@ namespace NGames.UI
             _nameplate.SetActive(true);
             _nameplateLabel.text = name.ToUpperInvariant();
 
-            var dark = new Color(accentColor.r * 0.10f, accentColor.g * 0.10f, accentColor.b * 0.10f, 0.96f);
+            var dark = new Color(accentColor.r * 0.10f, accentColor.g * 0.10f, accentColor.b * 0.10f, 0.94f);
             _nameplateBg.color  = dark;
             _nameplateBar.color = accentColor;
             _nameplateLabel.color = new Color(
@@ -244,32 +245,16 @@ namespace NGames.UI
                 Mathf.Lerp(accentColor.g, 1f, 0.65f),
                 Mathf.Lerp(accentColor.b, 1f, 0.65f), 1f);
 
-            if (rightAligned)
+            // Snap to the bottom strip of the active character slot
+            if (rightSlot)
             {
-                _nameplateRt.anchorMin = new Vector2(0.56f, 0.86f);
-                _nameplateRt.anchorMax = new Vector2(0.98f, 0.99f);
-                _nameplateLabel.alignment = TextAlignmentOptions.MidlineRight;
-                // Move accent bar to right side
-                var barRt = _nameplateBar.GetComponent<RectTransform>();
-                barRt.anchorMin = new Vector2(1f, 0f);
-                barRt.anchorMax = Vector2.one;
-                barRt.offsetMin = new Vector2(-5f, 0f);
-                barRt.offsetMax = Vector2.zero;
-                _nameplateLabel.GetComponent<RectTransform>().offsetMin = new Vector2(4f,  3f);
-                _nameplateLabel.GetComponent<RectTransform>().offsetMax = new Vector2(-12f, -3f);
+                _nameplateRt.anchorMin = new Vector2(SlotAnchorMin[1].x, 0f);
+                _nameplateRt.anchorMax = new Vector2(SlotAnchorMax[1].x, 0.12f);
             }
             else
             {
-                _nameplateRt.anchorMin = new Vector2(0.02f, 0.86f);
-                _nameplateRt.anchorMax = new Vector2(0.44f, 0.99f);
-                _nameplateLabel.alignment = TextAlignmentOptions.MidlineLeft;
-                var barRt = _nameplateBar.GetComponent<RectTransform>();
-                barRt.anchorMin = Vector2.zero;
-                barRt.anchorMax = new Vector2(0f, 1f);
-                barRt.offsetMin = Vector2.zero;
-                barRt.offsetMax = new Vector2(5f, 0f);
-                _nameplateLabel.GetComponent<RectTransform>().offsetMin = new Vector2(12f, 3f);
-                _nameplateLabel.GetComponent<RectTransform>().offsetMax = new Vector2(-4f,  -3f);
+                _nameplateRt.anchorMin = new Vector2(SlotAnchorMin[0].x, 0f);
+                _nameplateRt.anchorMax = new Vector2(SlotAnchorMax[0].x, 0.12f);
             }
 
             if (_panelAccentLine != null)
