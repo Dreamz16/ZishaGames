@@ -38,7 +38,7 @@ public class DemoLauncher : MonoBehaviour
 
         // Player character is always Ishani
         var gsm = GameStateManager.Instance;
-        if (gsm != null) gsm.SaveData.PlayerName = "Ishani";
+        if (gsm != null) gsm.SaveData.PlayerName = "Fortune";
 
         await EpisodeLoader.Instance.LoadAndPlayEpisodeAsync(_episode);
     }
