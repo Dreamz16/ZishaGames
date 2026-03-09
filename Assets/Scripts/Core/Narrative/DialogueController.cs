@@ -23,10 +23,11 @@ namespace NGames.Core.Narrative
         private const float MinDelay        = 1.8f;   // shortest pause (very short lines)
         private const float MaxDelay        = 6.0f;   // longest pause (very long lines)
 
-        private bool      _awaitingChoice;
-        private bool      _autoAdvancing;
-        private Coroutine _autoAdvanceCo;
-        private Coroutine _pulseCoroutine;
+        private bool                _awaitingChoice;
+        private bool                _autoAdvancing;
+        private Coroutine           _autoAdvanceCo;
+        private Coroutine           _pulseCoroutine;
+        private ChoicePresentedEvent _pendingChoices;
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
         private void Awake()
@@ -50,10 +51,11 @@ namespace NGames.Core.Narrative
             GameEventBus.Unsubscribe<SpeakerChangedEvent>(OnSpeakerChanged);
         }
 
-        // ── Input — tap skips the delay ────────────────────────────────────────
+        // ── Input — tap skips delay or reveals pending choices ────────────────
         private void Update()
         {
-            if (_awaitingChoice || !_autoAdvancing) return;
+            if (_awaitingChoice) return;
+            if (!_autoAdvancing && _pendingChoices == null) return;
 
             bool tapped =
                 (Keyboard.current    != null && (
@@ -62,7 +64,12 @@ namespace NGames.Core.Narrative
                 (Mouse.current       != null && Mouse.current.leftButton.wasPressedThisFrame) ||
                 (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame);
 
-            if (tapped) SkipDelay();
+            if (!tapped) return;
+
+            if (_pendingChoices != null)
+                RevealPendingChoices();
+            else
+                SkipDelay();
         }
 
         // ── Event Handlers ─────────────────────────────────────────────────────
@@ -86,8 +93,16 @@ namespace NGames.Core.Narrative
 
         private void OnChoicesPresented(ChoicePresentedEvent ev)
         {
-            _awaitingChoice = true;
             StopAutoAdvance();
+            _pendingChoices = ev;
+            SetAdvance(true);   // pulse indicator — tap to reveal choices
+        }
+
+        private void RevealPendingChoices()
+        {
+            var ev = _pendingChoices;
+            _pendingChoices = null;
+            _awaitingChoice = true;
             SetAdvance(false);
             _view.ShowChoices(ev.Choices, OnChoiceSelected);
         }
@@ -102,6 +117,7 @@ namespace NGames.Core.Narrative
         private void OnStoryEnded(StoryEndedEvent _)
         {
             _awaitingChoice = false;
+            _pendingChoices = null;
             StopAutoAdvance();
             SetAdvance(false);
             _view.ShowEndPanel();
