@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Ink.Runtime;
-using NGames.Core.State;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -310,145 +309,29 @@ namespace NGames.UI
 
             for (int i = 0; i < choices.Count; i++)
             {
-                string choiceText = choices[i].text;
+                var btn = Instantiate(_choiceButtonPrefab, _choicesContainer);
 
-                if (choiceText.StartsWith("input:"))
-                {
-                    string varName = choiceText.Substring("input:".Length);
-                    BuildTextInputChoice(i, varName, onChoiceSelected);
-                }
-                else
-                {
-                    var btn = Instantiate(_choiceButtonPrefab, _choicesContainer);
+                // Explicit height so VerticalLayoutGroup (ChildControlHeight=1) has something to work with
+                var le = btn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                le.preferredHeight = 62;
+                le.minHeight       = 48;
 
-                    var le = btn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
-                    le.preferredHeight = 62;
-                    le.minHeight       = 48;
-
-                    btn.Setup(i, choiceText, onChoiceSelected);
-                    btn.AnimateIn(i);
-                    _choiceButtons.Add(btn);
-                }
+                btn.Setup(i, choices[i].text, onChoiceSelected);
+                btn.AnimateIn(i);
+                _choiceButtons.Add(btn);
             }
         }
 
         public void HideChoices()
         {
+            foreach (var btn in _choiceButtons) Destroy(btn.gameObject);
             _choiceButtons.Clear();
 
             if (_choicesContainer != null)
-            {
-                for (int i = _choicesContainer.childCount - 1; i >= 0; i--)
-                    Destroy(_choicesContainer.GetChild(i).gameObject);
                 _choicesContainer.gameObject.SetActive(false);
-            }
 
+            // Restore dialogue text
             if (_dialogueText != null) _dialogueText.gameObject.SetActive(true);
-        }
-
-        private void BuildTextInputChoice(int index, string varName, Action<int> onChoiceSelected)
-        {
-            // Container
-            var container = new GameObject("NameInputChoice");
-            container.transform.SetParent(_choicesContainer, false);
-            var le = container.AddComponent<LayoutElement>();
-            le.preferredHeight = 90;
-            le.minHeight = 70;
-            container.AddComponent<RectTransform>();
-            var containerBg = container.AddComponent<Image>();
-            containerBg.color = new Color(0.10f, 0.10f, 0.16f, 0.92f);
-
-            // Input field background
-            var inputGo = new GameObject("InputField");
-            inputGo.transform.SetParent(container.transform, false);
-            var inputRt = inputGo.AddComponent<RectTransform>();
-            inputRt.anchorMin = new Vector2(0.02f, 0.12f);
-            inputRt.anchorMax = new Vector2(0.72f, 0.88f);
-            inputRt.offsetMin = inputRt.offsetMax = Vector2.zero;
-            var inputBg = inputGo.AddComponent<Image>();
-            inputBg.color = new Color(0.06f, 0.06f, 0.10f, 0.95f);
-            var inputField = inputGo.AddComponent<TMP_InputField>();
-
-            // Viewport
-            var viewportGo = new GameObject("Viewport");
-            viewportGo.transform.SetParent(inputGo.transform, false);
-            var viewportRt = viewportGo.AddComponent<RectTransform>();
-            viewportRt.anchorMin = Vector2.zero;
-            viewportRt.anchorMax = Vector2.one;
-            viewportRt.offsetMin = new Vector2(8, 2);
-            viewportRt.offsetMax = new Vector2(-8, -2);
-            viewportGo.AddComponent<RectMask2D>();
-
-            // Text
-            var textGo = new GameObject("Text");
-            textGo.transform.SetParent(viewportGo.transform, false);
-            var textRt = textGo.AddComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = textRt.offsetMax = Vector2.zero;
-            var textTmp = textGo.AddComponent<TextMeshProUGUI>();
-            textTmp.color = Color.white;
-            textTmp.fontSize = 18;
-            textTmp.raycastTarget = false;
-
-            // Placeholder
-            var phGo = new GameObject("Placeholder");
-            phGo.transform.SetParent(viewportGo.transform, false);
-            var phRt = phGo.AddComponent<RectTransform>();
-            phRt.anchorMin = Vector2.zero;
-            phRt.anchorMax = Vector2.one;
-            phRt.offsetMin = phRt.offsetMax = Vector2.zero;
-            var phTmp = phGo.AddComponent<TextMeshProUGUI>();
-            phTmp.color = new Color(0.55f, 0.55f, 0.65f, 0.8f);
-            phTmp.fontSize = 18;
-            phTmp.fontStyle = FontStyles.Italic;
-            phTmp.text = "Enter your name...";
-            phTmp.raycastTarget = false;
-
-            // Wire TMP_InputField
-            inputField.textViewport = viewportRt;
-            inputField.textComponent = textTmp;
-            inputField.placeholder = phTmp;
-            inputField.characterLimit = 32;
-            inputField.ActivateInputField();
-
-            // Confirm button
-            var confirmGo = new GameObject("ConfirmButton");
-            confirmGo.transform.SetParent(container.transform, false);
-            var confirmRt = confirmGo.AddComponent<RectTransform>();
-            confirmRt.anchorMin = new Vector2(0.74f, 0.12f);
-            confirmRt.anchorMax = new Vector2(0.98f, 0.88f);
-            confirmRt.offsetMin = confirmRt.offsetMax = Vector2.zero;
-            var confirmImg = confirmGo.AddComponent<Image>();
-            confirmImg.color = new Color(0.22f, 0.42f, 0.78f, 0.95f);
-            var confirmBtn = confirmGo.AddComponent<Button>();
-
-            var labelGo = new GameObject("Label");
-            labelGo.transform.SetParent(confirmGo.transform, false);
-            var labelRt = labelGo.AddComponent<RectTransform>();
-            labelRt.anchorMin = Vector2.zero;
-            labelRt.anchorMax = Vector2.one;
-            labelRt.offsetMin = labelRt.offsetMax = Vector2.zero;
-            var labelTmp = labelGo.AddComponent<TextMeshProUGUI>();
-            labelTmp.text = "Confirm";
-            labelTmp.alignment = TextAlignmentOptions.Center;
-            labelTmp.fontSize = 16;
-            labelTmp.color = Color.white;
-            labelTmp.raycastTarget = false;
-
-            void Confirm()
-            {
-                string entered = inputField.text.Trim();
-                if (!string.IsNullOrEmpty(entered) && varName == "player_name")
-                {
-                    var save = GameStateManager.Instance?.SaveData;
-                    if (save != null) save.PlayerName = entered;
-                }
-                onChoiceSelected(index);
-            }
-
-            confirmBtn.onClick.AddListener(Confirm);
-            inputField.onSubmit.AddListener(_ => Confirm());
         }
 
         // ── End Screen ─────────────────────────────────────────────────────────
