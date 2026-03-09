@@ -6,10 +6,17 @@ using UnityEngine;
 namespace NGames.UI
 {
     /// <summary>
-    /// Sets the character portrait inside DialogueView.
-    /// Shows a real sprite if found in Resources/Characters/{key},
-    /// otherwise shows a coloured placeholder with the character's initial.
-    /// During player choices shows Ishani (the player character).
+    /// Manages two character portrait slots inside DialogueView.
+    ///
+    /// Slot 0 = left, Slot 1 = right.
+    ///
+    /// When a speaker tag fires:
+    ///   - If the character is already in a slot → highlight that slot, fade the other.
+    ///   - If the character is new → place them in the first empty slot, or replace
+    ///     the currently-faded slot if both are occupied.
+    ///
+    /// During choices → Ishani (the player) appears in slot 0; slot 1 is hidden.
+    /// During narrator / story end → both slots hidden.
     /// </summary>
     public class CharacterDisplayManager : MonoBehaviour
     {
@@ -30,11 +37,15 @@ namespace NGames.UI
         };
 
         private DialogueView _view;
-        private GameObject _active3DCharacter;
-        private Camera _charCamera;
-        private RenderTexture _charRenderTexture;
-        private readonly Vector3 _stagePosition = new Vector3(100f, 100f, 0f);
 
+        // Slot state
+        private readonly string[] _slotKey   = new string[2]; // character key per slot; null = empty
+        private int               _activeSlot = 0;
+
+        private const float ActiveAlpha   = 1.00f;
+        private const float InactiveAlpha = 0.38f;
+
+        // ── Lifecycle ──────────────────────────────────────────────────────────
         private void Start()
         {
             _view = FindFirstObjectByType<DialogueView>();
@@ -56,111 +67,93 @@ namespace NGames.UI
             GameEventBus.Unsubscribe<SceneTransitionEvent>(OnScene);
         }
 
+        // ── Event handlers ─────────────────────────────────────────────────────
         private void OnSpeaker(SpeakerChangedEvent ev)
         {
             EnsureView();
+
             if (string.IsNullOrEmpty(ev.SpeakerName))
             {
-                _view?.ShowCharacterImage(false);
+                // Narrator — hide both slots
+                _view?.ShowCharacterSlot(0, false);
+                _view?.ShowCharacterSlot(1, false);
                 return;
             }
-            ShowCharacter(ev.SpeakerName);
+
+            string key = ev.SpeakerName.ToLowerInvariant();
+
+            // Find existing slot for this character
+            int targetSlot = -1;
+            for (int i = 0; i < 2; i++)
+                if (_slotKey[i] == key) { targetSlot = i; break; }
+
+            if (targetSlot < 0)
+            {
+                // New character: prefer an empty slot, otherwise replace the inactive one
+                for (int i = 0; i < 2; i++)
+                    if (_slotKey[i] == null) { targetSlot = i; break; }
+
+                if (targetSlot < 0)
+                    targetSlot = (_activeSlot == 0) ? 1 : 0;
+
+                _slotKey[targetSlot] = key;
+                ShowCharacterInSlot(ev.SpeakerName, targetSlot);
+            }
+
+            _activeSlot = targetSlot;
+            RefreshAlphas();
         }
 
         private void OnChoices(ChoicePresentedEvent _)
         {
             EnsureView();
             var playerName = GameStateManager.Instance?.SaveData?.PlayerName ?? "Ishani";
-            ShowCharacter(playerName);
+            _slotKey[0]  = playerName.ToLowerInvariant();
+            _slotKey[1]  = null;
+            _activeSlot  = 0;
+            ShowCharacterInSlot(playerName, 0);
+            _view?.ShowCharacterSlot(1, false);
+            _view?.SetSlotAlpha(0, ActiveAlpha);
         }
 
         private void OnEnd(StoryEndedEvent _)
         {
-            _view?.ShowCharacterImage(false);
-            Destroy3DCharacter();
+            _view?.ShowCharacterSlot(0, false);
+            _view?.ShowCharacterSlot(1, false);
+            _slotKey[0] = _slotKey[1] = null;
         }
 
         private void OnScene(SceneTransitionEvent _)
         {
-            _view?.ShowCharacterImage(false);
-            Destroy3DCharacter();
+            _view?.ShowCharacterSlot(0, false);
+            _view?.ShowCharacterSlot(1, false);
+            _slotKey[0] = _slotKey[1] = null;
         }
 
-        private void Destroy3DCharacter()
-        {
-            if (_active3DCharacter != null)
-            {
-                Destroy(_active3DCharacter);
-                _active3DCharacter = null;
-            }
-        }
-
-        private void SetupStage()
-        {
-            if (_charCamera != null) return;
-            
-            var camGo = new GameObject("CharacterStageCamera");
-            camGo.transform.position = _stagePosition + new Vector3(0f, 0f, -10f); 
-            _charCamera = camGo.AddComponent<Camera>();
-            _charCamera.clearFlags = CameraClearFlags.SolidColor;
-            _charCamera.backgroundColor = new Color(0, 0, 0, 0); // Transparent
-            _charCamera.orthographic = true;
-            _charCamera.orthographicSize = 2.5f; // zoom level for portrait
-            _charCamera.cullingMask = 1 << 31; // Render only the character layer
-            
-            _charRenderTexture = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32);
-            _charCamera.targetTexture = _charRenderTexture;
-        }
-
-        private void SetLayerRecursively(GameObject obj, int newLayer)
-        {
-            obj.layer = newLayer;
-            foreach (Transform child in obj.transform)
-            {
-                SetLayerRecursively(child.gameObject, newLayer);
-            }
-        }
-
-        private void ShowCharacter(string name)
+        // ── Helpers ────────────────────────────────────────────────────────────
+        private void ShowCharacterInSlot(string name, int slot)
         {
             if (_view == null) return;
-
-            var key    = name.ToLowerInvariant();
-
-            // -- NEW 3D CHARACTER LOGIC --
-            var prefab3D = Resources.Load<GameObject>($"Characters3D/{key}");
-            if (prefab3D != null)
-            {
-                Destroy3DCharacter();
-                SetupStage();
-                
-                // Spawn character far away at the hidden stage
-                _active3DCharacter = Instantiate(prefab3D, _stagePosition + new Vector3(0, -1.2f, 3f), Quaternion.identity);
-                SetLayerRecursively(_active3DCharacter, 31);
-                
-                // Route the render texture to the dialogue UI
-                _view.SetCharacterRenderTexture(_charRenderTexture);
-                return;
-            }
-            else
-            {
-                Destroy3DCharacter();
-            }
-            // -- END NEW 3D CHARACTER LOGIC --
-            
-            var tex    = Resources.Load<Texture2D>($"Characters/{key}");
-
+            var key = name.ToLowerInvariant();
+            var tex = Resources.Load<Texture2D>($"Characters/{key}");
             if (tex != null)
             {
                 var sprite = Sprite.Create(
-                    tex, new Rect(0, 0, tex.width, tex.height),
-                    new Vector2(0.5f, 0f), 100f);
-                _view.SetCharacterSprite(sprite);
+                    tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0f), 100f);
+                _view.SetSlotSprite(slot, sprite);
             }
             else
             {
-                // No image — show placeholder with initial and accent colour
-                _view.ShowCharacterPlaceholder(name, GetColor(key));
+                _view.SetSlotPlaceholder(slot, name, GetColor(key));
+            }
+        }
+
+        private void RefreshAlphas()
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                if (_slotKey[i] != null)
+                    _view?.SetSlotAlpha(i, i == _activeSlot ? ActiveAlpha : InactiveAlpha);
             }
         }
 

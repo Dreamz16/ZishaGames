@@ -9,8 +9,9 @@ using UnityEngine.UI;
 namespace NGames.UI
 {
     /// <summary>
-    /// Unified bottom panel: character portrait on left, dialogue text or choices on right.
-    /// No speaker name or accent bar.
+    /// Unified bottom panel: two character portrait slots (left / right) + dialogue text + choices.
+    /// Slot 0 = left, Slot 1 = right (portrait flipped to face inward).
+    /// Alpha is controlled externally by CharacterDisplayManager to highlight the active speaker.
     /// </summary>
     public class DialogueView : MonoBehaviour
     {
@@ -19,7 +20,7 @@ namespace NGames.UI
         [SerializeField] private GameObject      _dialoguePanel;
 
         [Header("Choices")]
-        [SerializeField] private Transform       _choicesContainer;
+        [SerializeField] private Transform        _choicesContainer;
         [SerializeField] private ChoiceButtonView _choiceButtonPrefab;
 
         [Header("End Screen")]
@@ -32,25 +33,35 @@ namespace NGames.UI
 
         private readonly List<ChoiceButtonView> _choiceButtons = new();
 
-        // Character portrait — created at runtime
-        private Image           _characterImage;
-        private Image           _placeholderBg;
-        private TextMeshProUGUI _placeholderInitial;
-        private RawImage        _characterRawImage; // NEW: For 3D RenderTextures
-        private RectTransform   _dialogueRt;
-        private CanvasGroup     _panelCg;
-        private Coroutine       _textAnimRoutine;
+        // ── Two character slots ────────────────────────────────────────────────
+        private readonly GameObject[]      _charSlot  = new GameObject[2];
+        private readonly Image[]           _portrait  = new Image[2];
+        private readonly Image[]           _phBg      = new Image[2];
+        private readonly TextMeshProUGUI[] _phInitial = new TextMeshProUGUI[2];
+        private readonly CanvasGroup[]     _slotCg    = new CanvasGroup[2];
 
-        // Anchor presets for dialogue text
-        private static readonly Vector2 TextAnchorMinFull    = new(0.02f, 0.06f);
-        private static readonly Vector2 TextAnchorMaxFull    = new(0.97f, 0.92f);
-        private static readonly Vector2 TextAnchorMinWithChar = new(0.27f, 0.06f);
-        private static readonly Vector2 TextAnchorMaxWithChar = new(0.97f, 0.92f);
+        // Slot anchors inside the dialogue panel rect
+        private static readonly Vector2[] SlotAnchorMin = { new(0f,    0f), new(0.78f, 0f) };
+        private static readonly Vector2[] SlotAnchorMax = { new(0.22f, 1f), new(1f,    1f) };
 
+        // Text area anchors — adjusted based on which slots are visible
+        private static readonly Vector2 TxtMinNone  = new(0.02f, 0.06f);
+        private static readonly Vector2 TxtMaxNone  = new(0.97f, 0.92f);
+        private static readonly Vector2 TxtMinLeft  = new(0.24f, 0.06f);
+        private static readonly Vector2 TxtMaxLeft  = new(0.97f, 0.92f);
+        private static readonly Vector2 TxtMinRight = new(0.02f, 0.06f);
+        private static readonly Vector2 TxtMaxRight = new(0.76f, 0.92f);
+        private static readonly Vector2 TxtMinBoth  = new(0.24f, 0.06f);
+        private static readonly Vector2 TxtMaxBoth  = new(0.76f, 0.92f);
+
+        private RectTransform _dialogueRt;
+        private CanvasGroup   _panelCg;
+        private Coroutine     _textAnimRoutine;
+
+        // ── Lifecycle ──────────────────────────────────────────────────────────
         private void Awake()
         {
-            // Self-wire
-            if (_dialogueText == null)     _dialogueText     = FindTMP("DialogueText");
+            if (_dialogueText == null) _dialogueText = FindTMP("DialogueText");
             if (_choicesContainer == null)
             {
                 var t = transform.parent?.Find("ChoicesContainer");
@@ -78,69 +89,118 @@ namespace NGames.UI
             if (_dialogueText != null)
                 _dialogueRt = _dialogueText.GetComponent<RectTransform>();
 
-            BuildCharacterImage();
+            BuildCharacterSlots();
         }
 
-        private void BuildCharacterImage()
+        // ── Character slots ────────────────────────────────────────────────────
+        private void BuildCharacterSlots()
         {
-            // Shared anchor rect
-            var slot = new GameObject("CharacterSlot");
-            slot.transform.SetParent(transform, false);
-            slot.transform.SetAsFirstSibling();
-            var slotRt = slot.AddComponent<RectTransform>();
-            slotRt.anchorMin = new Vector2(0f,    0f);
-            slotRt.anchorMax = new Vector2(0.25f, 1f);
-            slotRt.offsetMin = slotRt.offsetMax = Vector2.zero;
-            slot.SetActive(false);
+            for (int i = 0; i < 2; i++)
+            {
+                var slot = new GameObject($"CharacterSlot{i}");
+                slot.transform.SetParent(transform, false);
+                if (i == 0) slot.transform.SetAsFirstSibling();
 
-            // Real portrait image
-            var imgGo = new GameObject("Portrait");
-            imgGo.transform.SetParent(slot.transform, false);
-            _characterImage                = imgGo.AddComponent<Image>();
-            _characterImage.preserveAspect = true;
-            _characterImage.raycastTarget  = false;
-            _characterImage.color          = Color.white;
-            _characterImage.type           = Image.Type.Simple;
-            var imgRt = imgGo.GetComponent<RectTransform>();
-            imgRt.anchorMin = Vector2.zero;
-            imgRt.anchorMax = Vector2.one;
-            imgRt.offsetMin = imgRt.offsetMax = Vector2.zero;
+                var slotRt = slot.AddComponent<RectTransform>();
+                slotRt.anchorMin = SlotAnchorMin[i];
+                slotRt.anchorMax = SlotAnchorMax[i];
+                slotRt.offsetMin = slotRt.offsetMax = Vector2.zero;
 
-            // 3D Portrait RawImage
-            var rawGo = new GameObject("Portrait3D");
-            rawGo.transform.SetParent(slot.transform, false);
-            _characterRawImage                = rawGo.AddComponent<RawImage>();
-            _characterRawImage.raycastTarget  = false;
-            _characterRawImage.color          = Color.white;
-            _characterRawImage.gameObject.SetActive(false);
-            var rawRt = rawGo.GetComponent<RectTransform>();
-            rawRt.anchorMin = Vector2.zero;
-            rawRt.anchorMax = Vector2.one;
-            rawRt.offsetMin = rawRt.offsetMax = Vector2.zero;
+                _slotCg[i] = slot.AddComponent<CanvasGroup>();
+                _slotCg[i].alpha = 1f;
+                slot.SetActive(false);
+                _charSlot[i] = slot;
 
-            // Placeholder — dark tinted background + initial letter
-            var phGo = new GameObject("Placeholder");
-            phGo.transform.SetParent(slot.transform, false);
-            _placeholderBg              = phGo.AddComponent<Image>();
-            _placeholderBg.raycastTarget = false;
-            var phRt = phGo.GetComponent<RectTransform>();
-            phRt.anchorMin = Vector2.zero;
-            phRt.anchorMax = Vector2.one;
-            phRt.offsetMin = phRt.offsetMax = Vector2.zero;
+                // Portrait image
+                var imgGo = new GameObject("Portrait");
+                imgGo.transform.SetParent(slot.transform, false);
+                _portrait[i] = imgGo.AddComponent<Image>();
+                _portrait[i].preserveAspect = true;
+                _portrait[i].raycastTarget  = false;
+                _portrait[i].color          = Color.white;
+                var imgRt = imgGo.GetComponent<RectTransform>();
+                imgRt.anchorMin = Vector2.zero;
+                imgRt.anchorMax = Vector2.one;
+                imgRt.offsetMin = imgRt.offsetMax = Vector2.zero;
+                // Slot 1 (right side) faces inward
+                if (i == 1) imgGo.transform.localScale = new Vector3(-1f, 1f, 1f);
 
-            var initGo  = new GameObject("Initial");
-            initGo.transform.SetParent(phGo.transform, false);
-            _placeholderInitial                = initGo.AddComponent<TextMeshProUGUI>();
-            _placeholderInitial.alignment      = TextAlignmentOptions.Center;
-            _placeholderInitial.fontStyle      = FontStyles.Bold;
-            _placeholderInitial.enableAutoSizing = true;
-            _placeholderInitial.fontSizeMin    = 24;
-            _placeholderInitial.fontSizeMax    = 120;
-            _placeholderInitial.raycastTarget  = false;
-            var initRt = initGo.GetComponent<RectTransform>();
-            initRt.anchorMin = new Vector2(0.1f, 0.2f);
-            initRt.anchorMax = new Vector2(0.9f, 0.8f);
-            initRt.offsetMin = initRt.offsetMax = Vector2.zero;
+                // Placeholder — coloured bg + initial letter
+                var phGo = new GameObject("Placeholder");
+                phGo.transform.SetParent(slot.transform, false);
+                _phBg[i] = phGo.AddComponent<Image>();
+                _phBg[i].raycastTarget = false;
+                var phRt = phGo.GetComponent<RectTransform>();
+                phRt.anchorMin = Vector2.zero;
+                phRt.anchorMax = Vector2.one;
+                phRt.offsetMin = phRt.offsetMax = Vector2.zero;
+
+                var initGo = new GameObject("Initial");
+                initGo.transform.SetParent(phGo.transform, false);
+                _phInitial[i] = initGo.AddComponent<TextMeshProUGUI>();
+                _phInitial[i].alignment        = TextAlignmentOptions.Center;
+                _phInitial[i].fontStyle        = FontStyles.Bold;
+                _phInitial[i].enableAutoSizing = true;
+                _phInitial[i].fontSizeMin      = 24;
+                _phInitial[i].fontSizeMax      = 120;
+                _phInitial[i].raycastTarget    = false;
+                var initRt = initGo.GetComponent<RectTransform>();
+                initRt.anchorMin = new Vector2(0.1f, 0.2f);
+                initRt.anchorMax = new Vector2(0.9f, 0.8f);
+                initRt.offsetMin = initRt.offsetMax = Vector2.zero;
+            }
+        }
+
+        /// <summary>Show or hide a character slot (0 = left, 1 = right).</summary>
+        public void ShowCharacterSlot(int slot, bool show)
+        {
+            if (slot < 0 || slot >= 2 || _charSlot[slot] == null) return;
+            _charSlot[slot].SetActive(show);
+            UpdateTextAnchors();
+        }
+
+        /// <summary>Display a sprite portrait in the given slot.</summary>
+        public void SetSlotSprite(int slot, Sprite sprite)
+        {
+            if (slot < 0 || slot >= 2) return;
+            if (_portrait[slot] != null) { _portrait[slot].sprite = sprite; _portrait[slot].gameObject.SetActive(true); }
+            if (_phBg[slot]     != null) _phBg[slot].gameObject.SetActive(false);
+            ShowCharacterSlot(slot, true);
+        }
+
+        /// <summary>Display a coloured placeholder with the character's initial.</summary>
+        public void SetSlotPlaceholder(int slot, string name, Color accentColor)
+        {
+            if (slot < 0 || slot >= 2) return;
+            if (_portrait[slot] != null) _portrait[slot].gameObject.SetActive(false);
+            if (_phBg[slot] != null)
+            {
+                _phBg[slot].color = new Color(
+                    accentColor.r * 0.18f, accentColor.g * 0.18f, accentColor.b * 0.18f, 0.95f);
+                _phBg[slot].gameObject.SetActive(true);
+            }
+            if (_phInitial[slot] != null)
+            {
+                _phInitial[slot].text  = string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpper();
+                _phInitial[slot].color = new Color(accentColor.r, accentColor.g, accentColor.b, 0.85f);
+            }
+            ShowCharacterSlot(slot, true);
+        }
+
+        /// <summary>Set the CanvasGroup alpha of a slot (1 = highlighted, ~0.4 = faded).</summary>
+        public void SetSlotAlpha(int slot, float alpha)
+        {
+            if (slot < 0 || slot >= 2 || _slotCg[slot] == null) return;
+            _slotCg[slot].alpha = alpha;
+        }
+
+        private void UpdateTextAnchors()
+        {
+            if (_dialogueRt == null) return;
+            bool a = _charSlot[0] != null && _charSlot[0].activeSelf;
+            bool b = _charSlot[1] != null && _charSlot[1].activeSelf;
+            _dialogueRt.anchorMin = (a && b) ? TxtMinBoth  : a ? TxtMinLeft  : b ? TxtMinRight  : TxtMinNone;
+            _dialogueRt.anchorMax = (a && b) ? TxtMaxBoth  : a ? TxtMaxLeft  : b ? TxtMaxRight  : TxtMaxNone;
         }
 
         private TextMeshProUGUI FindTMP(string childName)
@@ -149,72 +209,7 @@ namespace NGames.UI
             return t != null ? t.GetComponent<TextMeshProUGUI>() : null;
         }
 
-        // ── Character portrait ─────────────────────────────────────────────────
-        private Transform CharacterSlot => _characterImage?.transform.parent;
-
-        /// <summary>Show a real sprite portrait.</summary>
-        public void SetCharacterSprite(Sprite sprite)
-        {
-            if (_characterImage == null) return;
-            _characterImage.sprite = sprite;
-            _characterImage.gameObject.SetActive(true);
-            if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
-            if (_placeholderBg != null) _placeholderBg.gameObject.SetActive(false);
-            ShowSlot(true);
-        }
-
-        /// <summary>Show a 3D Render Texture inside the character slot.</summary>
-        public void SetCharacterRenderTexture(RenderTexture rt)
-        {
-            if (_characterRawImage == null) return;
-            _characterRawImage.texture = rt;
-            _characterRawImage.gameObject.SetActive(true);
-            if (_characterImage != null) _characterImage.gameObject.SetActive(false);
-            if (_placeholderBg != null) _placeholderBg.gameObject.SetActive(false);
-            ShowSlot(true);
-        }
-
-        /// <summary>Show a coloured placeholder with the character's initial letter.</summary>
-        public void ShowCharacterPlaceholder(string name, Color accentColor)
-        {
-            if (_placeholderBg == null) return;
-            _characterImage.gameObject.SetActive(false);
-            if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
-
-            _placeholderBg.color = new Color(
-                accentColor.r * 0.18f, accentColor.g * 0.18f, accentColor.b * 0.18f, 0.95f);
-            _placeholderBg.gameObject.SetActive(true);
-
-            if (_placeholderInitial != null)
-            {
-                _placeholderInitial.text  = string.IsNullOrEmpty(name) ? "?" : name[..1].ToUpper();
-                _placeholderInitial.color = new Color(accentColor.r, accentColor.g, accentColor.b, 0.85f);
-            }
-            ShowSlot(true);
-        }
-
-        /// <summary>Hide the entire character slot (portrait + placeholder).</summary>
-        public void ShowCharacterImage(bool show)
-        {
-            ShowSlot(show);
-            if (!show)
-            {
-                if (_characterImage  != null) _characterImage.gameObject.SetActive(false);
-                if (_characterRawImage != null) _characterRawImage.gameObject.SetActive(false);
-                if (_placeholderBg   != null) _placeholderBg.gameObject.SetActive(false);
-            }
-        }
-
-        private void ShowSlot(bool show)
-        {
-            var slot = CharacterSlot;
-            if (slot != null) slot.gameObject.SetActive(show);
-            if (_dialogueRt == null) return;
-            _dialogueRt.anchorMin = show ? TextAnchorMinWithChar : TextAnchorMinFull;
-            _dialogueRt.anchorMax = show ? TextAnchorMaxWithChar : TextAnchorMaxFull;
-        }
-
-        // ── Dialogue ───────────────────────────────────────────────────────────
+        // ── Dialogue text ──────────────────────────────────────────────────────
         public void SetDialogueText(string text)
         {
             if (_dialogueText != null)
@@ -267,7 +262,7 @@ namespace NGames.UI
             if (img != null) { var c = img.color; img.color = new Color(c.r, c.g, c.b, alpha); }
         }
 
-        // ── TMP Typewriter helpers ─────────────────────────────────────────────
+        // ── TMP typewriter helpers ─────────────────────────────────────────────
         public void SetMaxVisibleCharacters(int count)
         {
             if (_dialogueText != null) _dialogueText.maxVisibleCharacters = count;
@@ -301,21 +296,15 @@ namespace NGames.UI
         public void ShowChoices(List<Choice> choices, Action<int> onChoiceSelected)
         {
             HideChoices();
-
-            // Hide dialogue text — choices take the right side
             if (_dialogueText != null) _dialogueText.gameObject.SetActive(false);
-
             _choicesContainer.gameObject.SetActive(true);
 
             for (int i = 0; i < choices.Count; i++)
             {
                 var btn = Instantiate(_choiceButtonPrefab, _choicesContainer);
-
-                // Explicit height so VerticalLayoutGroup (ChildControlHeight=1) has something to work with
-                var le = btn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                var le  = btn.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
                 le.preferredHeight = 62;
                 le.minHeight       = 48;
-
                 btn.Setup(i, choices[i].text, onChoiceSelected);
                 btn.AnimateIn(i);
                 _choiceButtons.Add(btn);
@@ -326,15 +315,11 @@ namespace NGames.UI
         {
             foreach (var btn in _choiceButtons) Destroy(btn.gameObject);
             _choiceButtons.Clear();
-
-            if (_choicesContainer != null)
-                _choicesContainer.gameObject.SetActive(false);
-
-            // Restore dialogue text
-            if (_dialogueText != null) _dialogueText.gameObject.SetActive(true);
+            if (_choicesContainer != null) _choicesContainer.gameObject.SetActive(false);
+            if (_dialogueText    != null) _dialogueText.gameObject.SetActive(true);
         }
 
-        // ── End Screen ─────────────────────────────────────────────────────────
+        // ── End screen ─────────────────────────────────────────────────────────
         public void ShowEndPanel()
         {
             if (_endPanel != null) _endPanel.SetActive(true);
