@@ -74,15 +74,6 @@ namespace NGames.Core.State
         public string GetEpisodeState(string episodeId)
             => SaveData.EpisodeStates.TryGetValue(episodeId, out var s) ? s : null;
 
-        /// <summary>Overwrite SaveData from a JSON string (used by account-based resume).</summary>
-        public void RestoreSaveData(string json)
-        {
-            if (string.IsNullOrEmpty(json)) return;
-            try   { JsonUtility.FromJsonOverwrite(json, SaveData); }
-            catch (Exception ex)
-            { Debug.LogError($"[GameStateManager] RestoreSaveData failed: {ex.Message}"); }
-        }
-
         // ── Flags / Counters / Strings ─────────────────────────────────────────
         public bool GetFlag(string key)                => SaveData.Flags.TryGetValue(key, out var v) && v;
         public void SetFlag(string key, bool value)    { SaveData.Flags[key] = value; }
