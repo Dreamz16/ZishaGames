@@ -30,9 +30,14 @@ namespace NGames.Core.Narrative
         private Story          _story;
         private EpisodeManifest _currentEpisode;
 
+        // Lookahead buffer: when narrator batching reads a character line, it is
+        // stored here and consumed on the next ContinueStory() call.
+        private string       _pendingLine;
+        private List<string> _pendingTags;
+
         // ── Public state ───────────────────────────────────────────────────────
         public bool             IsStoryActive    => _story != null;
-        public bool             CanContinue      => _story?.canContinue ?? false;
+        public bool             CanContinue      => _pendingLine != null || (_story?.canContinue ?? false);
         public List<Choice>     CurrentChoices   => _story?.currentChoices ?? new List<Choice>();
         public string           CurrentEpisodeId => _currentEpisode?.EpisodeId;
 
@@ -80,29 +85,81 @@ namespace NGames.Core.Narrative
         public string ContinueStory()
         {
             if (_story == null) { Debug.LogWarning("[NarrativeManager] No story loaded."); return string.Empty; }
-            if (!_story.canContinue) { HandleStoryEnd(); return string.Empty; }
 
-            // Auto-skip blank lines (tag-only lines produce empty text).
-            // Accumulate tags from every Continue() call so speaker/scene tags
-            // on their own line are not lost when the next call overwrites currentTags.
-            var allTags = new List<string>();
-            string line = _story.Continue().Trim();
-            if (_story.currentTags != null) allTags.AddRange(_story.currentTags);
+            string line;
+            List<string> allTags;
 
-            while (string.IsNullOrEmpty(line) && _story.canContinue)
+            // Use the lookahead buffer if a character line was pre-read during narrator batching.
+            if (_pendingLine != null)
             {
-                line = _story.Continue().Trim();
+                line    = _pendingLine;
+                allTags = _pendingTags ?? new List<string>();
+                _pendingLine = null;
+                _pendingTags = null;
+            }
+            else
+            {
+                if (!_story.canContinue) { HandleStoryEnd(); return string.Empty; }
+
+                allTags = new List<string>();
+                line    = _story.Continue().Trim();
                 if (_story.currentTags != null) allTags.AddRange(_story.currentTags);
+
+                // Skip tag-only blank lines, accumulating their tags.
+                while (string.IsNullOrEmpty(line) && _story.canContinue)
+                {
+                    line = _story.Continue().Trim();
+                    if (_story.currentTags != null) allTags.AddRange(_story.currentTags);
+                }
             }
 
             bool speakerTagFound = ProcessTags(allTags);
             if (!speakerTagFound)
                 GameEventBus.Publish(new SpeakerChangedEvent { SpeakerName = string.Empty });
 
+            // ── Narrator batching ──────────────────────────────────────────────
+            // If this line has no speaker, read ahead and concatenate all
+            // consecutive narrator lines so they appear as a single block.
+            if (!speakerTagFound && !string.IsNullOrEmpty(line))
+            {
+                var sb = new System.Text.StringBuilder(line);
+
+                while (_story.canContinue && _story.currentChoices.Count == 0)
+                {
+                    var nextTags = new List<string>();
+                    string nextLine = _story.Continue().Trim();
+                    if (_story.currentTags != null) nextTags.AddRange(_story.currentTags);
+
+                    // Skip blank/tag-only lines, accumulating their tags.
+                    while (string.IsNullOrEmpty(nextLine) && _story.canContinue)
+                    {
+                        nextLine = _story.Continue().Trim();
+                        if (_story.currentTags != null) nextTags.AddRange(_story.currentTags);
+                    }
+
+                    bool nextHasSpeaker = nextTags.Exists(t =>
+                        t.Trim().ToLowerInvariant().StartsWith("speaker:"));
+
+                    if (nextHasSpeaker)
+                    {
+                        // This is a character line — store it for the next ContinueStory() call.
+                        _pendingLine = nextLine;
+                        _pendingTags = nextTags;
+                        break;
+                    }
+
+                    if (!string.IsNullOrEmpty(nextLine))
+                        sb.Append("\n\n").Append(nextLine);
+                }
+
+                line = sb.ToString();
+            }
+            // ── End narrator batching ──────────────────────────────────────────
+
             if (!string.IsNullOrEmpty(line))
                 GameEventBus.Publish(new StoryLineReadEvent { Text = line, EpisodeId = _currentEpisode?.EpisodeId });
 
-            if (!_story.canContinue && _story.currentChoices.Count == 0)
+            if (!_story.canContinue && _story.currentChoices.Count == 0 && _pendingLine == null)
                 HandleStoryEnd();
             else if (_story.currentChoices.Count > 0)
                 GameEventBus.Publish(new ChoicePresentedEvent { EpisodeId = _currentEpisode?.EpisodeId, Choices = _story.currentChoices });
@@ -152,6 +209,8 @@ namespace NGames.Core.Narrative
         public void JumpToKnot(string knotName)
         {
             if (_story == null) return;
+            _pendingLine = null;
+            _pendingTags = null;
             _story.ChoosePathString(knotName);
             ContinueStory();
         }
@@ -161,6 +220,8 @@ namespace NGames.Core.Narrative
         {
             _story          = null;
             _currentEpisode = null;
+            _pendingLine    = null;
+            _pendingTags    = null;
         }
 
         // Returns true if a speaker tag was found
