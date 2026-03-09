@@ -124,6 +124,17 @@ namespace NGames.UI
         private static readonly VoiceConfig DefaultMale   =
             new() { MacOSVoice = "Alex",     Rate = 145, Pitch = 0.95f };
 
+        // ── Sync properties (read by DialogueController's TypewriterRoutine) ──
+        /// <summary>
+        /// Chars-per-second the typewriter should use so text reveal ends at the
+        /// same time as TTS speech for the current line.
+        /// -1 when no voice is speaking (narrator) — typewriter uses its own default.
+        /// </summary>
+        public static float SyncedCPS            { get; private set; } = -1f;
+
+        /// <summary>Estimated TTS duration for the current line in seconds.</summary>
+        public static float EstimatedTtsDuration { get; private set; } = 0f;
+
         // ── State ─────────────────────────────────────────────────────────────
         private string _currentSpeaker = string.Empty;
 
@@ -161,7 +172,13 @@ namespace NGames.UI
 
         private void OnLine(StoryLineReadEvent ev)
         {
-            if (string.IsNullOrEmpty(_currentSpeaker)) return;
+            if (string.IsNullOrEmpty(_currentSpeaker))
+            {
+                // Narrator — no voice, reset sync so typewriter uses its own speed
+                SyncedCPS            = -1f;
+                EstimatedTtsDuration = 0f;
+                return;
+            }
             Speak(ev.Text, _currentSpeaker);
         }
 
@@ -174,6 +191,13 @@ namespace NGames.UI
 
             var cfg  = CharVoices.TryGetValue(characterKey, out var v) ? v : DefaultFemale;
             text     = ExtractEmotion(text, ref cfg);
+
+            // Compute typewriter sync — must be set before DialogueController's
+            // TypewriterRoutine resumes (it yields one frame to read these values).
+            EstimatedTtsDuration = EstimateTtsDuration(text, cfg.Rate);
+            SyncedCPS            = EstimatedTtsDuration > 0f
+                ? ComputeSyncedCPS(text, EstimatedTtsDuration)
+                : -1f;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             JS_SpeakWebGL(text, cfg.Rate, cfg.Pitch);
@@ -269,6 +293,43 @@ namespace NGames.UI
             { Debug.LogWarning($"[VoiceManager] PowerShell TTS failed: {e.Message}"); }
         }
 #endif
+
+        // ── Sync calculation ───────────────────────────────────────────────────
+        /// <summary>
+        /// Estimates how many seconds TTS will take to speak <paramref name="text"/>
+        /// at <paramref name="wpm"/> words per minute.
+        /// </summary>
+        private static float EstimateTtsDuration(string text, int wpm)
+        {
+            if (string.IsNullOrWhiteSpace(text) || wpm <= 0) return 0f;
+            var words = text.Trim().Split(
+                new[] { ' ', '\t', '\n' },
+                System.StringSplitOptions.RemoveEmptyEntries).Length;
+            return words > 0 ? words / (wpm / 60f) : 0f;
+        }
+
+        /// <summary>
+        /// Returns the chars-per-second the typewriter should run at so that
+        /// all characters are revealed in exactly <paramref name="targetSecs"/> seconds,
+        /// using the same punctuation-pause weights the typewriter applies.
+        /// Clamped to [20, 90] for readability.
+        /// </summary>
+        private static float ComputeSyncedCPS(string text, float targetSecs)
+        {
+            if (string.IsNullOrWhiteSpace(text) || targetSecs <= 0f) return -1f;
+
+            // Mirror DialogueController's typewriter weight per character
+            float weight = 0f;
+            foreach (char c in text)
+            {
+                if      (c == '.' || c == '!' || c == '?' || c == '…') weight += 5.0f;
+                else if (c == ',' || c == ';' || c == ':')              weight += 2.5f;
+                else if (c == ' ' || c == '\n')                         weight += 0.3f;
+                else                                                     weight += 1.0f;
+            }
+
+            return Mathf.Clamp(weight / targetSecs, 20f, 90f);
+        }
 
         // ── Stop ───────────────────────────────────────────────────────────────
         private void StopSpeech()

@@ -126,14 +126,20 @@ namespace NGames.Core.Narrative
         private IEnumerator TypewriterRoutine()
         {
             _typewriterRunning = true;
+
+            // Yield one frame so VoiceManager.OnLine (which subscribes after
+            // DialogueController) can run and set VoiceManager.SyncedCPS.
+            yield return null;
+
             _view.ForceMeshUpdate();
-            int total = _view.GetVisibleCharacterCount();
+            int   total = _view.GetVisibleCharacterCount();
+            float cps   = VoiceManager.SyncedCPS > 0f ? VoiceManager.SyncedCPS : CharsPerSecond;
 
             for (int i = 1; i <= total; i++)
             {
                 _view.SetMaxVisibleCharacters(i);
                 char c = _view.GetCharAt(i - 1);
-                float delay = 1f / CharsPerSecond;
+                float delay = 1f / cps;
                 if (c == '.' || c == '!' || c == '?' || c == '…') delay *= 5f;
                 else if (c == ',' || c == ';' || c == ':')         delay *= 2.5f;
                 else if (c == ' ' || c == '\n')                    delay *= 0.3f;
@@ -150,7 +156,12 @@ namespace NGames.Core.Narrative
             _view.ShowAllCharacters();
             if (NarrativeManager.Instance?.CanContinue == true)
             {
-                float delay = ReadingDelay(_currentLineText);
+                // When voice is playing the typewriter was paced to match TTS duration,
+                // so they finish together — use a short breath pause rather than a full
+                // reading-speed delay.  Narrator text (no voice) keeps the word-count delay.
+                float delay = VoiceManager.EstimatedTtsDuration > 0f
+                    ? 0.35f
+                    : ReadingDelay(_currentLineText);
                 _autoAdvanceCo = StartCoroutine(AutoAdvanceRoutine(delay));
             }
             else if (_pendingChoices != null)
