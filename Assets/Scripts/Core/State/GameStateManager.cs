@@ -32,7 +32,10 @@ namespace NGames.Core.State
             if (Instance != null && Instance != this) { Destroy(gameObject); return; }
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            LoadFromDisk(slotIndex: 0);
+            if (SaveSystem.PendingLoadSlot >= 0)
+                LoadFromDisk(SaveSystem.PendingLoadSlot);
+            else
+                SaveData = new SaveData();
         }
 
         private void OnEnable()
