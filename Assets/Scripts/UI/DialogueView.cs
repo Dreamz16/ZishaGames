@@ -219,6 +219,12 @@ namespace NGames.UI
             }
         }
 
+        public void SetDialogueAlignment(TextAlignmentOptions alignment)
+        {
+            if (_dialogueText != null)
+                _dialogueText.alignment = alignment;
+        }
+
         public void AnimateLineIn()
         {
             if (_textAnimRoutine != null) StopCoroutine(_textAnimRoutine);

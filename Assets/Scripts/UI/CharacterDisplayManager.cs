@@ -74,9 +74,10 @@ namespace NGames.UI
 
             if (string.IsNullOrEmpty(ev.SpeakerName))
             {
-                // Narrator — hide both slots
+                // Narrator — hide both slots, reset to left alignment
                 _view?.ShowCharacterSlot(0, false);
                 _view?.ShowCharacterSlot(1, false);
+                _view?.SetDialogueAlignment(TMPro.TextAlignmentOptions.Left);
                 return;
             }
 
@@ -102,6 +103,9 @@ namespace NGames.UI
 
             _activeSlot = targetSlot;
             RefreshAlphas();
+            _view?.SetDialogueAlignment(_activeSlot == 0
+                ? TMPro.TextAlignmentOptions.Left
+                : TMPro.TextAlignmentOptions.Right);
         }
 
         private void OnChoices(ChoicePresentedEvent _)
@@ -114,6 +118,7 @@ namespace NGames.UI
             ShowCharacterInSlot(playerName, 0);
             _view?.ShowCharacterSlot(1, false);
             _view?.SetSlotAlpha(0, ActiveAlpha);
+            _view?.SetDialogueAlignment(TMPro.TextAlignmentOptions.Left);
         }
 
         private void OnEnd(StoryEndedEvent _)
