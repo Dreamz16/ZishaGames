@@ -1,0 +1,13 @@
+{
+  "name": "ngames-pipeline",
+  "version": "1.0.0",
+  "description": "Watches Writer/ for .twee files and converts them to Ink for Unity auto-reload",
+  "main": "watch.js",
+  "scripts": {
+    "start": "node watch.js",
+    "convert": "node twee-to-ink.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  }
+}

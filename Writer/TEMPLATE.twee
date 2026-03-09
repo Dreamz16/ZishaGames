@@ -1,0 +1,80 @@
+:: StoryTitle
+My New Episode
+
+:: StoryData
+{
+    "ifid": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+    "format": "SugarCube",
+    "format-version": "2.37.3",
+    "zoom": 1
+}
+
+:: StoryVars
+<<set $bond_fang to 0>>
+<<set $bond_marcus to 0>>
+<<set $bond_lawrence to 0>>
+<<set $choice_made to false>>
+
+:: Start
+scene: forest_path
+mood: mysterious
+music: white_night
+
+Lawrence: (glancing at the dense tree line, voice low) "Something's out there."
+
+Fang: (ears pricked, nostrils flaring) "You're not wrong. I can smell it."
+
+[[Move toward the sound->ForestClearing]]
+[[Hold your ground->ForestHold]]
+
+:: ForestClearing
+scene: forest_clearing
+mood: tense
+music: fas_et_nefas_building
+
+Lawrence: "Stay close."
+
+[[The creature lunges->ForestFight]]
+[[It turns and vanishes->ForestMystery]]
+
+:: ForestHold
+scene: forest_path
+mood: tense
+
+Fang: (quietly, eyes scanning the dark) "Smart. Patience wins fights."
+
+<<set $bond_fang += 1>>
+
+[[Continue->ForestClearing]]
+
+:: ForestFight
+scene: forest_clearing
+mood: action
+music: fas_et_nefas_building
+
+Lawrence: (bracing himself) "Here it comes!"
+
+<<set $choice_made to true>>
+
+[[Dodge left->ForestFightEnd]]
+[[Stand your ground->ForestFightEnd]]
+
+:: ForestFightEnd
+mood: neutral
+
+The creature retreats into the shadows.
+
+Fang: "Nice moves."
+
+-> END
+
+:: ForestMystery
+scene: forest_clearing
+mood: mysterious
+music: white_night
+
+Lawrence: "What was that thing?"
+
+Fang: (shaking her head slowly) "Something old. Something that remembered us."
+
+-> END
